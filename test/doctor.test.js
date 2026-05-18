@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 import { createRegistry } from "../src/core/registry.js";
 import { inspectRegistry } from "../src/core/doctor.js";
 import { loadAdapters } from "../src/core/adapter-loader.js";
 
-const rootDir = new URL("..", import.meta.url).pathname;
+const rootDir = fileURLToPath(new URL("..", import.meta.url));
 
 test("starter manifests pass strict load with no errors", async () => {
     const registry = await createRegistry({ rootDir });

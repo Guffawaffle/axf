@@ -223,7 +223,7 @@ test("init materialize writes a real capability file from a family entry", async
     assert.deepEqual(manifest.sourceFamily, {
         family: "git",
         command: "status",
-        manifestPath: "manifests/families/git.family.json"
+        manifestPath: path.join("manifests", "families", "git.family.json")
     });
     assert.equal(manifest.argMap.branch, "--branch");
 });

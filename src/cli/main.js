@@ -9,8 +9,9 @@ import { findWorkspaceRoot } from "../core/workspace.js";
 import { parseOptionTokens, splitCommandTokens } from "./options.js";
 import { AxError } from "../core/errors.js";
 import { resolveCliLaunchPlan } from "../core/cli-launch-plan.js";
+import { scoutWorkspace } from "../core/scout.js";
 
-const COMMANDS = new Set(["list", "inspect", "run", "init", "doctor", "promote", "demote", "help"]);
+const COMMANDS = new Set(["list", "inspect", "run", "init", "doctor", "promote", "demote", "scout", "help"]);
 
 export async function main(argv, env = {}) {
     const cwd = env.cwd ?? process.cwd();
@@ -39,6 +40,10 @@ export async function main(argv, env = {}) {
 
     if (command === "init") {
         await initCommand(rootDir, rest);
+        return;
+    }
+    if (command === "scout") {
+        await scoutCommand(rootDir, rest, processEnv);
         return;
     }
 
@@ -556,6 +561,40 @@ async function doctorCommand(registry, adapters, tokens, ws = null) {
     }
 }
 
+async function scoutCommand(rootDir, tokens, env = process.env) {
+    const parsed = parseOptionTokens(tokens);
+    const check = Boolean(parsed.options.check);
+    const write = Boolean(parsed.options.write);
+    if (check && write) {
+        throw new AxError("scout accepts either --check or --write, not both", 2);
+    }
+
+    const report = await scoutWorkspace({ rootDir, check, write, env });
+    if (parsed.options.json) {
+        printJson(report);
+        return;
+    }
+
+    console.log(`imports: ${report.imports.length}`);
+    console.log(`changes: ${report.changeCount}`);
+    for (const issue of report.issues) {
+        console.log(`${issue.severity}: ${issue.message}`);
+    }
+    for (const change of report.changes) {
+        const suffix = change.command ? ` (${change.family}.${change.command})` : ` (${change.family})`;
+        console.log(`${change.action}: ${change.path}${suffix}`);
+    }
+    if (write && report.changeCount > 0) {
+        console.log("scout wrote manifest updates");
+    }
+    if (!write && report.changeCount > 0) {
+        console.log("run 'axf scout --write' to materialize these changes");
+    }
+    if (report.changeCount === 0) {
+        console.log("scout: manifests are in sync");
+    }
+}
+
 function printHelp() {
     console.log(`axf framework prototype
 
@@ -574,6 +613,7 @@ Usage:
     axf init adapter --toolspace <ts> --kind provider <name> [--composes <type>]
     axf promote <id> --to <draft|reviewed|active> [--json]
     axf demote <id> --to <draft|reviewed> [--json]
+    axf scout [--check|--write] [--json]
     axf doctor [--json]
 
 Lifecycle flag:
@@ -589,6 +629,7 @@ Examples:
     axf init capability global.acme.status
     axf init adapter --kind provider acme --composes cli
     axf promote global.acme.status --to active
+    axf scout --check
 `);
 }
 

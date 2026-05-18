@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
     loadAdapters,
     FRAMEWORK_ADAPTERS_ROOT
 } from "../src/core/adapter-loader.js";
 
-const FRAMEWORK_ROOT = new URL("..", import.meta.url).pathname;
+const FRAMEWORK_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 async function makeTmpWorkspace() {
     const dir = await mkdtemp(path.join(os.tmpdir(), "axf-fb-"));
@@ -99,6 +100,5 @@ test("framework checkout itself does not double-load its own adapters", async ()
 });
 
 test("FRAMEWORK_ADAPTERS_ROOT points at the bundled adapters directory", () => {
-    assert.ok(FRAMEWORK_ADAPTERS_ROOT.endsWith("/adapters/")
-        || FRAMEWORK_ADAPTERS_ROOT.endsWith("/adapters"));
+    assert.equal(path.basename(path.normalize(FRAMEWORK_ADAPTERS_ROOT)), "adapters");
 });

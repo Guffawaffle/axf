@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createRegistry } from "../src/core/registry.js";
 import { resolveCapability } from "../src/core/resolver.js";
 import { executeResolvedCapability } from "../src/core/executor.js";
 import { loadAdapters } from "../src/core/adapter-loader.js";
 
-const rootDir = new URL("..", import.meta.url).pathname;
+const rootDir = fileURLToPath(new URL("..", import.meta.url));
 
 async function ctx() {
     const registry = await createRegistry({ rootDir });

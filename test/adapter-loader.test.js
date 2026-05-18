@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadAdapters } from "../src/core/adapter-loader.js";
 import { executeResolvedCapability } from "../src/core/executor.js";
 
-const rootDir = new URL("..", import.meta.url).pathname;
+const rootDir = fileURLToPath(new URL("..", import.meta.url));
 
 test("loads built-in internal and cli type adapters", async () => {
     const adapters = await loadAdapters({ rootDir });

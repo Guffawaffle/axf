@@ -5,7 +5,7 @@ provides a small command surface, explicit manifests, adapter-based
 execution, lifecycle gates, and schema-validated args for workspace
 toolspaces.
 
-> Status: **alpha**. The core loop is in place: discover, inspect,
+> Status: **alpha**. The core loop is in place: scout, inspect,
 > execute, scaffold, and promote capabilities through one contract.
 > Manifest version `axf/v0` is the current alpha contract.
 
@@ -72,6 +72,7 @@ axf doctor
 axf list
 axf inspect echo say
 axf run echo say --message hello
+axf scout --check
 axf run toy echo say --message hello
 axf init capability global.acme.status
 ```

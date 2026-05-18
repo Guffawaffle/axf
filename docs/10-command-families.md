@@ -108,6 +108,43 @@ Resolve drift either by re-materializing (delete the file and run
 `axf init materialize` again) or by editing the materialized file to
 bring it back in line.
 
+## Scout imports
+
+`axf scout` is the explicit executable-discovery boundary for repo-local
+command sources. Normal `axf list`, `axf inspect`, and `axf run` stay
+manifest-backed; `scout` reads declared imports from `axf.workspace.json`
+and reconciles those sources into family and capability manifests.
+
+Example workspace marker:
+
+```json
+{
+  "manifestVersion": "axf/v0",
+  "name": "my-repo",
+  "imports": [
+    {
+      "kind": "ax-inventory",
+      "family": "my-repo",
+      "path": ".ax/ax.ps1",
+      "providerArgStyle": "powershell-pascal"
+    }
+  ]
+}
+```
+
+Scout modes:
+
+```sh
+axf scout          # preview drift from declared import sources
+axf scout --check  # fail if manifests are out of sync
+axf scout --write  # update materialized manifests
+```
+
+For `ax-inventory` imports, scout runs the declared `.ax` dispatcher with
+`list -Json`. Commands that expose framework-reserved public args, such
+as `all`, are emitted as standalone capability files so the family
+manifest remains loadable.
+
 ## Workflow
 
 ```text
@@ -121,3 +158,6 @@ materialize  (only what you must override; axf init materialize)
   ↓
 promote    (axf promote <id> --to active)
 ```
+
+For repo-local `.ax` command families, use `scout` as the compiler step
+between source command inventory and runtime manifests.

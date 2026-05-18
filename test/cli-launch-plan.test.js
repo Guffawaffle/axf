@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createRegistry } from "../src/core/registry.js";
 import { resolveCapability } from "../src/core/resolver.js";
 import { executeResolvedCapability } from "../src/core/executor.js";
 import { loadAdapters } from "../src/core/adapter-loader.js";
 import { main } from "../src/cli/main.js";
 
-const frameworkRoot = new URL("..", import.meta.url).pathname;
+const frameworkRoot = fileURLToPath(new URL("..", import.meta.url));
 
 test("cli adapter resolves a workspace-relative target through a declared launcher", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));
