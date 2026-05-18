@@ -145,6 +145,11 @@ For `ax-inventory` imports, scout runs the declared `.ax` dispatcher with
 as `all`, are emitted as standalone capability files so the family
 manifest remains loadable.
 
+Provider command names are normalized to AXF-safe kebab-case command
+keys. For example, a provider command named `dist:win` is exposed as
+`dist-win`, while the generated `executionTarget.args` still invokes the
+provider's original `dist:win` command.
+
 ## Workflow
 
 ```text

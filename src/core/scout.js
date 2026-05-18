@@ -209,13 +209,14 @@ function buildFamilyManifest({ rootDir, importSource, inventory, existingFamily 
     };
 
     for (const axCommand of inventory.commands) {
-        const commandName = axCommand.name;
-        if (!commandName || commandName === "help" || commandName === "list") continue;
+        const providerCommandName = axCommand.name;
+        if (!providerCommandName || providerCommandName === "help" || providerCommandName === "list") continue;
+        const commandName = toKebab(providerCommandName);
         const existingCommand = existingFamily?.commands?.[commandName] ?? {};
         const args = buildArgs(axCommand, existingCommand);
         family.commands[commandName] = {
             summary: existingCommand.summary ?? axCommand.description ?? `${familyName} ${commandName}`,
-            executionTarget: existingCommand.executionTarget ?? { ...executionTarget, args: [commandName] },
+            executionTarget: existingCommand.executionTarget ?? { ...executionTarget, args: [providerCommandName] },
             argsSchema: buildArgsSchema(axCommand, args, existingCommand.argsSchema),
             sideEffects: axCommand.sideEffects ?? existingCommand.sideEffects ?? "unknown",
             args
@@ -383,6 +384,7 @@ function normalizeLifecycleState(value) {
 
 function toKebab(name) {
     return name
+        .replace(/[:]+/g, "-")
         .replace(/_/g, "-")
         .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
         .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")

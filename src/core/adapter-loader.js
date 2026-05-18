@@ -62,7 +62,7 @@ export async function loadAdapters({
 } = {}) {
     const adaptersRoot = path.join(rootDir, "adapters");
     const registry = new AdapterRegistry(rootDir);
-    await registry.loadFrom(adaptersRoot);
+    await registry.loadFrom(adaptersRoot, { optional: true });
     await registry.loadToolspacePrivateFrom(path.join(rootDir, "toolspaces"));
     if (enableFrameworkFallback && frameworkAdaptersRoot) {
         // Skip the fallback when the workspace IS the framework checkout;
@@ -95,12 +95,13 @@ export class AdapterRegistry {
         this.loadIssues = [];
     }
 
-    async loadFrom(adaptersRoot) {
+    async loadFrom(adaptersRoot, { optional = false } = {}) {
         let entries;
         try {
             entries = await readdir(adaptersRoot, { withFileTypes: true });
         } catch (error) {
             if (error.code === "ENOENT") {
+                if (optional) return;
                 this.loadIssues.push({
                     severity: "error",
                     message: `adapters root '${path.relative(this.rootDir, adaptersRoot)}' is missing`

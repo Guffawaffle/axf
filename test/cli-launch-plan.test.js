@@ -70,6 +70,55 @@ test("cli adapter resolves a workspace-relative target through a declared launch
     }
 });
 
+test("cli adapter runs from the bound workspace for relative launcher args", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));
+    try {
+        await bootstrapWorkspace(root);
+        await mkdir(path.join(root, "tools"), { recursive: true });
+        await writeFile(
+            path.join(root, "tools", "launcher.mjs"),
+            `console.log(JSON.stringify({ cwd: process.cwd(), argv: process.argv.slice(2) }));\n`
+        );
+        await writeFile(path.join(root, "tools", "payload.mjs"), "// target placeholder\n");
+        await writeCapability(root, {
+            manifestVersion: "axf/v0",
+            id: "global.demo.cwd",
+            summary: "demo",
+            provider: "demo",
+            adapterType: "cli",
+            executionTarget: {
+                launcher: { command: process.execPath, args: ["tools/launcher.mjs"] },
+                target: {
+                    path: "tools/payload.mjs",
+                    relativeTo: "workspace"
+                }
+            },
+            argsSchema: { type: "object", properties: {} },
+            outputModes: ["json"],
+            sideEffects: "none",
+            scope: "global",
+            lifecycleState: "active",
+            defaults: {},
+            policies: [],
+            owner: "test"
+        });
+
+        const registry = await createRegistry({ rootDir: root });
+        const adapters = await loadAdapters({ rootDir: frameworkRoot });
+        const resolved = resolveCapability(registry, ["demo", "cwd"], { args: {} });
+        const result = await executeResolvedCapability(resolved, {
+            adapters,
+            runtime: { workspace: { root, viaMarker: true, source: "explicit" } }
+        });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.data.cwd, root);
+        assert.deepEqual(result.data.argv, [path.join(root, "tools", "payload.mjs")]);
+    } finally {
+        await rm(root, { recursive: true, force: true });
+    }
+});
+
 test("cli adapter resolves an env-bound target root with a workspace-relative fallback", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));
     const sibling = path.join(path.dirname(root), `${path.basename(root)}-managed`);

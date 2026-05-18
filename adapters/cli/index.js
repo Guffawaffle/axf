@@ -8,7 +8,9 @@ export async function execute(resolved, ctx = {}) {
     const { capability, args } = resolved;
     const launchPlan = resolveCliLaunchPlan(capability, { runtime: ctx.runtime ?? null });
     const cliArgs = [...launchPlan.argsPrefix, ...argsToCliArgs(args, capability)];
+    const cwd = ctx.runtime?.workspace?.root ?? undefined;
     const result = spawnSync(launchPlan.command, cliArgs, {
+        cwd,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"]
     });

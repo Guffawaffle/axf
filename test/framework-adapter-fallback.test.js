@@ -11,9 +11,11 @@ import {
 
 const FRAMEWORK_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-async function makeTmpWorkspace() {
+async function makeTmpWorkspace({ adapters = true } = {}) {
     const dir = await mkdtemp(path.join(os.tmpdir(), "axf-fb-"));
-    await mkdir(path.join(dir, "adapters"), { recursive: true });
+    if (adapters) {
+        await mkdir(path.join(dir, "adapters"), { recursive: true });
+    }
     await mkdir(path.join(dir, "manifests", "capabilities"), { recursive: true });
     await mkdir(path.join(dir, "manifests", "toolspaces"), { recursive: true });
     return dir;
@@ -29,6 +31,15 @@ test("framework fallback loads cli + internal type adapters in an empty workspac
     assert.ok(internal, "internal type adapter should fall back to framework");
     assert.equal(cli.provenance, "framework");
     assert.equal(internal.provenance, "framework");
+});
+
+test("framework fallback does not require a workspace adapters directory", async () => {
+    const ws = await makeTmpWorkspace({ adapters: false });
+    const adapters = await loadAdapters({ rootDir: ws });
+
+    assert.ok(adapters.get("cli"));
+    assert.ok(adapters.get("internal"));
+    assert.deepEqual(adapters.loadIssues, []);
 });
 
 test("framework fallback does NOT load provider adapters (e.g. majel)", async () => {

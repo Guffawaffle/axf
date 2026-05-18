@@ -48,6 +48,13 @@ const inventory = {
         { name: "All", type: "SwitchParameter", switch: true },
         { name: "Last", type: "Int32", switch: false }
       ]
+        },
+        {
+            name: "dist:win",
+            description: "Build Windows artifacts",
+            script: "Dist-Win.ps1",
+            sideEffects: "write",
+            parameters: []
     }
   ]
 };
@@ -97,6 +104,8 @@ test("scout checks and writes ax inventory imports", async () => {
 
     const family = JSON.parse(await readFile(path.join(root, "manifests", "families", "demo.family.json"), "utf8"));
     assert.ok(family.commands.status);
+    assert.ok(family.commands["dist-win"]);
+    assert.deepEqual(family.commands["dist-win"].executionTarget.args, ["dist:win"]);
     assert.equal(family.commands.status.args.summary.providerFlag, undefined);
     assert.equal(family.commands.status.argsSchema.properties.summary.type, "boolean");
     assert.equal(family.commands["log-query"], undefined, "reserved --all command should not stay in the family manifest");
