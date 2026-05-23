@@ -111,7 +111,8 @@ Every adapter must answer:
 | Provider | Type adapter | Provider adapter | Why |
 |---|---|---|---|
 | `global.echo.say` | `internal` | none | smallest in-process capability |
-| `global.lex.recall` | `cli` | none | sample CLI-backed read capability |
+| `global.lex.status` | `cli` | none | sample CLI-backed read capability from the imported Lex family |
+| `global.lex.remember` | `cli` | none | sample CLI-backed write capability with visible `sideEffects: "write"` |
 | `global.majel.status` | `cli` | `majel` | sample provider-adapter capability with envelope normalization |
 
 The provider-adapter example under [`adapters/majel/index.js`](../adapters/majel/index.js)

@@ -1,0 +1,190 @@
+{
+  "manifestVersion": "axf/v0",
+  "family": "scmod",
+  "scope": "global",
+  "provider": "scmod",
+  "adapterType": "cli",
+  "providerAdapter": "stfc",
+  "providerArgStyle": "double-dash-kebab",
+  "outputModes": ["json"],
+  "sideEffects": "unknown",
+  "lifecycleState": "active",
+  "owner": "module:scmod",
+  "commands": {
+    "help": {
+      "summary": "Show available scmod AXF provider commands",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "help"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "list": {
+      "summary": "Alias of help",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "list"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "status": {
+      "summary": "One-shot health check: git, build, deploy, game, log",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "status"] },
+      "args": {
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "doctor": {
+      "summary": "Check tooling, paths, build outputs, and config files",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "doctor"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "windows-interop": {
+      "summary": "Check the Windows PowerShell + dotnet bridge",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "windows-interop"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "game-running": {
+      "summary": "WSL-side check for prime.exe via PowerShell",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "game-running"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "config": {
+      "summary": "Show scmod settings TOML or runtime vars from the game folder",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "config"] },
+      "args": {
+        "runtime-vars": { "type": "boolean" },
+        "legacy": { "type": "boolean" },
+        "compact": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "build": {
+      "summary": "Sync repo to Windows mirror, then `dotnet build` via dotnet.exe",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "build"] },
+      "args": {
+        "tail": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "deploy": {
+      "summary": "Build, copy plugin DLLs into BepInEx/plugins, verify hash",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "deploy"] },
+      "args": {
+        "tail": { "type": "integer" }
+      },
+      "sideEffects": "write"
+    },
+    "cycle": {
+      "summary": "Stop prime.exe -> deploy -> start prime.exe -> wait for fresh boot banner",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "cycle"] },
+      "args": {
+        "tail": { "type": "integer" },
+        "stop-timeout-sec": { "type": "integer" },
+        "start-timeout-sec": { "type": "integer" },
+        "boot-timeout-sec": { "type": "integer" },
+        "poll-ms": { "type": "integer" },
+        "error-last": { "type": "integer" }
+      },
+      "sideEffects": "write"
+    },
+    "deploy-status": {
+      "summary": "Compare built and deployed plugin DLL hashes",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "deploy-status"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "dump-search": {
+      "summary": "Search dump.cs with regex + context",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "dump-search"] },
+      "args": {
+        "pattern": { "type": "string", "required": true },
+        "context": { "type": "integer" },
+        "max-results": { "type": "integer" },
+        "case-sensitive": { "type": "boolean" },
+        "path": { "type": "string" }
+      },
+      "sideEffects": "read"
+    },
+    "log": {
+      "summary": "Unified community_patch.log entry; modes: --slice/--session/--errors/--boot",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "log"] },
+      "args": {
+        "tail": { "type": "integer" },
+        "last": { "type": "integer" },
+        "pattern": { "type": "string" },
+        "case-sensitive": { "type": "boolean" },
+        "raw": { "type": "boolean" },
+        "session": { "type": "boolean" },
+        "errors": { "type": "boolean" },
+        "boot": { "type": "boolean" },
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "log-slice": {
+      "summary": "Tail/filter community_patch.log",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "log-slice"] },
+      "args": {
+        "tail": { "type": "integer" },
+        "last": { "type": "integer" },
+        "pattern": { "type": "string" },
+        "case-sensitive": { "type": "boolean" },
+        "raw": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "log-errors": {
+      "summary": "Show error/warning lines from community_patch.log",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "log-errors"] },
+      "args": {
+        "last": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "log-boot": {
+      "summary": "Show the most recent boot banner sequence",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "log-boot"] },
+      "args": {
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "log-session": {
+      "summary": "Show post-boot lines from the current session",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "log-session"] },
+      "args": {
+        "last": { "type": "integer" },
+        "pattern": { "type": "string" },
+        "raw": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "preflight": {
+      "summary": "Aggregate status + boot + recent errors (pre-cycle gate)",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "preflight"] },
+      "args": {
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "postflight": {
+      "summary": "Aggregate deploy-status + boot + recent errors (post-cycle gate)",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "postflight"] },
+      "args": {
+        "error-last": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "battle-audit": {
+      "summary": "Audit battle feed for ghost damage (hull loss not in logged attacks). Scopely-proof mode.",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-guff-port/scripts/axf/scmod-provider.mjs", "battle-audit"] },
+      "args": {
+        "last": { "type": "integer" },
+        "type": { "type": "integer" },
+        "battle-id": { "type": "string" }
+      },
+      "sideEffects": "read"
+    }
+  }
+}

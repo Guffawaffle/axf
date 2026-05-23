@@ -75,6 +75,10 @@ capability:
   "launchPlan": {
     "command": "pwsh",
     "argsPrefix": ["-File", "/abs/scripts/build.ps1"],
+    "requestedCommand": "pwsh",
+    "resolvedCommand": "pwsh",
+    "commandSource": "path:...",
+    "launchStrategy": "direct",
     "targetPath": "/abs/scripts/build.ps1",
     "targetSource": "workspace"
   }
@@ -83,6 +87,35 @@ capability:
 
 This is the source of truth — the runtime executor uses the same
 resolver via `src/core/cli-launch-plan.js`.
+
+## Windows npm shims
+
+On Windows, npm-installed CLIs often resolve to `.cmd` or `.bat` shims
+rather than native executables. AXF now keeps the manifest contract the
+same (`"command": "lex"`) and resolves the platform detail at launch
+time:
+
+- direct executables continue to run directly
+- resolved `.cmd` / `.bat` shims are launched explicitly through
+  `cmd.exe /d /s /c`
+- `axf inspect` surfaces both the requested command and the resolved
+  command so the behavior is observable
+
+This keeps repo manifests portable and avoids per-repo PowerShell
+wrapper scripts for standard npm-installed tools.
+
+## WSL diagnostics
+
+`axf doctor` inspects the resolved `axf`, `lex`, `node`, and `npm`
+commands when running under WSL. It warns when:
+
+- PATH entries under `/mnt/c/...` are being used for npm shims
+- a CLI capability resolves its command or target across the Linux /
+  Windows boundary
+- the documented native AXF entry at `/srv/axf/bin/axf.js` is missing
+
+The goal is to diagnose Windows PATH contamination clearly, not to
+label WSL itself as broken.
 
 ## Validation
 
