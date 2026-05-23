@@ -76,6 +76,7 @@ export function collectRuntimeDiagnostics(registry, options = {}) {
     env = process.env,
     platform = process.platform,
     osRelease = os.release(),
+    cwd = process.cwd(),
   } = options;
 
   const wsl = isWslEnvironment({ env, platform, osRelease });
@@ -144,13 +145,14 @@ export function collectRuntimeDiagnostics(registry, options = {}) {
 
   const runtimeContext = workspace
     ? {
+        cwd,
         workspace: {
           root: workspace.root,
           viaMarker: workspace.viaMarker,
           source: workspace.source,
         },
       }
-    : null;
+    : { cwd };
   const seen = new Set();
   for (const capability of registry.listCapabilities({ includeDrafts: true })) {
     if (capability.adapterType !== "cli") {

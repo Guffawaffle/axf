@@ -73,12 +73,12 @@ export async function main(argv, env = {}) {
   }
   if (command === "inspect") {
     const adapters = await loadAdapters({ rootDir });
-    await inspectCommand(registry, adapters, rest, ws, processEnv);
+    await inspectCommand(registry, adapters, rest, ws, processEnv, cwd);
     return;
   }
   if (command === "run") {
     const adapters = await loadAdapters({ rootDir });
-    await runCommand(registry, adapters, rest, ws, processEnv);
+    await runCommand(registry, adapters, rest, ws, processEnv, cwd);
     return;
   }
   if (command === "promote") {
@@ -165,6 +165,7 @@ async function inspectCommand(
   tokens,
   ws = null,
   env = process.env,
+  cwd = process.cwd(),
 ) {
   const { pathTokens, options } = splitCommandTokens(tokens);
   if (pathTokens.length === 0) {
@@ -173,7 +174,7 @@ async function inspectCommand(
 
   const resolved = registry.resolveInspectable(pathTokens);
   const cap = resolved.capability;
-  const runtime = buildRuntime(ws, env);
+  const runtime = buildRuntime(ws, env, cwd);
   const launchPlan =
     cap.adapterType === "cli"
       ? buildInspectableLaunchPlan(cap, runtime, env)
@@ -263,6 +264,9 @@ async function inspectCommand(
         `launch.target: ${launchPlan.targetPath} (${launchPlan.targetSource})`,
       );
     }
+    if (launchPlan.cwd) {
+      console.log(`launch.cwd: ${launchPlan.cwd} (${launchPlan.cwdSource})`);
+    }
   }
 }
 
@@ -272,6 +276,7 @@ async function runCommand(
   tokens,
   ws = null,
   env = process.env,
+  cwd = process.cwd(),
 ) {
   const { pathTokens, options } = splitCommandTokens(tokens);
   if (pathTokens.length === 0) {
@@ -283,7 +288,7 @@ async function runCommand(
     args: options,
     allowDraft: Boolean(options["any-lifecycle"] ?? options["allow-draft"]),
   });
-  const runtime = buildRuntime(ws, env);
+  const runtime = buildRuntime(ws, env, cwd);
   const result = await executeResolvedCapability(resolved, {
     adapters,
     runtime,
@@ -710,8 +715,9 @@ async function doctorCommand(
   }
 }
 
-function buildRuntime(ws = null, env = process.env) {
+function buildRuntime(ws = null, env = process.env, cwd = process.cwd()) {
   const runtime = {
+    cwd,
     env,
     platform: process.platform,
   };

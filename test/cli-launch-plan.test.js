@@ -20,7 +20,7 @@ test("cli adapter resolves a workspace-relative target through a declared launch
     await mkdir(path.join(root, "tools"), { recursive: true });
     await writeFile(
       path.join(root, "tools", "echo.mjs"),
-      `console.log(JSON.stringify({ argv: process.argv.slice(2) }));\n`,
+      `console.log(JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }));\n`,
     );
     await writeCapability(root, {
       manifestVersion: "axf/v0",
@@ -62,8 +62,11 @@ test("cli adapter resolves a workspace-relative target through a declared launch
     assert.equal(result.ok, true);
     assert.deepEqual(result.data, {
       argv: ["seed", "--message", "hello"],
+      cwd: root,
     });
     assert.equal(result.meta.launchPlan.command, process.execPath);
+    assert.equal(result.meta.launchPlan.cwd, root);
+    assert.equal(result.meta.launchPlan.cwdSource, "workspace");
     assert.equal(
       result.meta.launchPlan.targetPath,
       path.join(root, "tools", "echo.mjs"),
@@ -74,53 +77,118 @@ test("cli adapter resolves a workspace-relative target through a declared launch
   }
 });
 
-test("cli adapter runs from the bound workspace for relative launcher args", async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));
-    try {
-        await bootstrapWorkspace(root);
-        await mkdir(path.join(root, "tools"), { recursive: true });
-        await writeFile(
-            path.join(root, "tools", "launcher.mjs"),
-            `console.log(JSON.stringify({ cwd: process.cwd(), argv: process.argv.slice(2) }));\n`
-        );
-        await writeFile(path.join(root, "tools", "payload.mjs"), "// target placeholder\n");
-        await writeCapability(root, {
-            manifestVersion: "axf/v0",
-            id: "global.demo.cwd",
-            summary: "demo",
-            provider: "demo",
-            adapterType: "cli",
-            executionTarget: {
-                launcher: { command: process.execPath, args: ["tools/launcher.mjs"] },
-                target: {
-                    path: "tools/payload.mjs",
-                    relativeTo: "workspace"
-                }
-            },
-            argsSchema: { type: "object", properties: {} },
-            outputModes: ["json"],
-            sideEffects: "none",
-            scope: "global",
-            lifecycleState: "active",
-            defaults: {},
-            policies: [],
-            owner: "test"
-        });
+test("cli execution uses bound workspace cwd when invoked elsewhere", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));
+  const caller = await mkdtemp(path.join(os.tmpdir(), "ax-cli-caller-"));
+  try {
+    await bootstrapWorkspace(root);
+    await mkdir(path.join(root, "tools"), { recursive: true });
+    await writeFile(
+      path.join(root, "tools", "cwd.mjs"),
+      `console.log(JSON.stringify({ cwd: process.cwd(), marker: process.argv.slice(2) }));\n`,
+    );
+    await writeCapability(root, {
+      manifestVersion: "axf/v0",
+      id: "global.demo.cwd",
+      summary: "cwd reporter",
+      provider: "demo",
+      adapterType: "cli",
+      executionTarget: {
+        launcher: { command: process.execPath },
+        target: {
+          path: "tools/cwd.mjs",
+          relativeTo: "workspace",
+        },
+        args: ["seed"],
+      },
+      argsSchema: { type: "object", properties: {} },
+      outputModes: ["json"],
+      sideEffects: "read",
+      scope: "global",
+      lifecycleState: "active",
+      defaults: {},
+      policies: [],
+      owner: "test",
+    });
 
-        const registry = await createRegistry({ rootDir: root });
-        const adapters = await loadAdapters({ rootDir: frameworkRoot });
-        const resolved = resolveCapability(registry, ["demo", "cwd"], { args: {} });
-        const result = await executeResolvedCapability(resolved, {
-            adapters,
-            runtime: { workspace: { root, viaMarker: true, source: "explicit" } }
-        });
+    const out = await captureStdout(() =>
+      main(["--workspace", root, "run", "global.demo.cwd", "--json"], {
+        cwd: caller,
+        env: process.env,
+      }),
+    );
+    const result = JSON.parse(out);
 
-        assert.equal(result.ok, true);
-        assert.equal(result.data.cwd, root);
-        assert.deepEqual(result.data.argv, [path.join(root, "tools", "payload.mjs")]);
-    } finally {
-        await rm(root, { recursive: true, force: true });
-    }
+    assert.equal(result.ok, true);
+    assert.equal(result.data.cwd, root);
+    assert.deepEqual(result.data.marker, ["seed"]);
+    assert.equal(result.meta.cwd, root);
+    assert.equal(result.meta.launchPlan.cwd, root);
+    assert.equal(result.meta.launchPlan.cwdSource, "workspace");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(caller, { recursive: true, force: true });
+  }
+});
+
+test("cli executionTarget cwd overrides the workspace default", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));
+  const caller = await mkdtemp(path.join(os.tmpdir(), "ax-cli-caller-"));
+  const workDir = path.join(root, "packages", "app");
+  try {
+    await bootstrapWorkspace(root);
+    await mkdir(path.join(root, "tools"), { recursive: true });
+    await mkdir(workDir, { recursive: true });
+    await writeFile(
+      path.join(root, "tools", "cwd.mjs"),
+      `console.log(JSON.stringify({ cwd: process.cwd() }));\n`,
+    );
+    await writeCapability(root, {
+      manifestVersion: "axf/v0",
+      id: "global.demo.cwd-override",
+      summary: "cwd override reporter",
+      provider: "demo",
+      adapterType: "cli",
+      executionTarget: {
+        launcher: { command: process.execPath },
+        target: {
+          path: "tools/cwd.mjs",
+          relativeTo: "workspace",
+        },
+        cwd: { path: "packages/app", relativeTo: "workspace" },
+      },
+      argsSchema: { type: "object", properties: {} },
+      outputModes: ["json"],
+      sideEffects: "read",
+      scope: "global",
+      lifecycleState: "active",
+      defaults: {},
+      policies: [],
+      owner: "test",
+    });
+
+    const out = await captureStdout(() =>
+      main([
+        "--workspace",
+        root,
+        "run",
+        "global.demo.cwd-override",
+        "--json",
+      ], {
+        cwd: caller,
+        env: process.env,
+      }),
+    );
+    const result = JSON.parse(out);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.data.cwd, workDir);
+    assert.equal(result.meta.launchPlan.cwd, workDir);
+    assert.equal(result.meta.launchPlan.cwdSource, "executionTarget.cwd:workspace");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(caller, { recursive: true, force: true });
+  }
 });
 
 test("cli adapter resolves an env-bound target root with a workspace-relative fallback", async () => {
@@ -182,6 +250,7 @@ test("cli adapter resolves an env-bound target root with a workspace-relative fa
     assert.deepEqual(result.data, {
       argv: ["probe", "--note", "fallback"],
     });
+    assert.equal(result.meta.launchPlan.cwd, root);
     assert.equal(
       result.meta.launchPlan.targetSource,
       "fallback:AX_TARGET_ROOT",
@@ -241,6 +310,8 @@ test("inspect --json includes the resolved cli launch plan", async () => {
     const parsed = JSON.parse(out);
 
     assert.equal(parsed.launchPlan.command, process.execPath);
+    assert.equal(parsed.launchPlan.cwd, root);
+    assert.equal(parsed.launchPlan.cwdSource, "workspace");
     assert.deepEqual(parsed.launchPlan.argsPrefix, [
       "--no-warnings",
       path.join(root, "tools", "echo.mjs"),

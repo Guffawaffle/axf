@@ -343,6 +343,8 @@ test("external workspace can use framework Lex globals without copied manifests"
   assert.equal(recall.capability.id, "global.lex.recall");
   assert.equal(recall.capability.sideEffects, "read");
   assert.equal(recall.adapter.provenance, "framework");
+  assert.equal(recall.launchPlan.cwd, root);
+  assert.equal(recall.launchPlan.cwdSource, "workspace");
 
   const remember = JSON.parse(
     await captureStdout(() =>
@@ -351,6 +353,8 @@ test("external workspace can use framework Lex globals without copied manifests"
   );
   assert.equal(remember.capability.id, "global.lex.remember");
   assert.equal(remember.capability.sideEffects, "write");
+  assert.equal(remember.launchPlan.cwd, root);
+  assert.equal(remember.launchPlan.cwdSource, "workspace");
 
   const workspaceRun = JSON.parse(
     await captureStdout(() =>

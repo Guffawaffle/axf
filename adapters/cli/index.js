@@ -18,9 +18,9 @@ export async function execute(resolved, ctx = {}) {
     env: ctx.runtime?.env ?? process.env,
     platform: ctx.runtime?.platform ?? process.platform,
   });
-  const cwd = ctx.runtime?.workspace?.root ?? undefined;
+  const meta = buildLaunchMeta(capability, invocation, launchPlan);
   const result = spawnSync(invocation.command, invocation.args, {
-    cwd,
+    cwd: launchPlan.cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -29,10 +29,7 @@ export async function execute(resolved, ctx = {}) {
     return {
       ok: false,
       error: { message: result.error.message },
-      meta: {
-        capabilityId: capability.id,
-        adapterType: "cli",
-      },
+      meta,
     };
   }
 
@@ -45,8 +42,7 @@ export async function execute(resolved, ctx = {}) {
           `process exited with status ${result.status}`,
       },
       meta: {
-        capabilityId: capability.id,
-        adapterType: "cli",
+        ...meta,
         status: result.status,
       },
     };
@@ -56,21 +52,28 @@ export async function execute(resolved, ctx = {}) {
   return {
     ok: true,
     data: parseJsonMaybe(stdout),
-    meta: {
-      capabilityId: capability.id,
-      adapterType: "cli",
+    meta,
+  };
+}
+
+function buildLaunchMeta(capability, invocation, launchPlan) {
+  return {
+    capabilityId: capability.id,
+    adapterType: "cli",
+    command: invocation.command,
+    args: invocation.args,
+    cwd: launchPlan.cwd,
+    launchPlan: {
       command: invocation.command,
       args: invocation.args,
-      launchPlan: {
-        command: invocation.command,
-        args: invocation.args,
-        requestedCommand: invocation.requestedCommand,
-        resolvedCommand: invocation.resolvedCommand,
-        commandSource: invocation.commandSource,
-        launchStrategy: invocation.launchStrategy,
-        targetPath: launchPlan.targetPath,
-        targetSource: launchPlan.targetSource,
-      },
+      cwd: launchPlan.cwd,
+      cwdSource: launchPlan.cwdSource,
+      requestedCommand: invocation.requestedCommand,
+      resolvedCommand: invocation.resolvedCommand,
+      commandSource: invocation.commandSource,
+      launchStrategy: invocation.launchStrategy,
+      targetPath: launchPlan.targetPath,
+      targetSource: launchPlan.targetSource,
     },
   };
 }

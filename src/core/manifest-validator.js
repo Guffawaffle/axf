@@ -196,6 +196,23 @@ export function validateCapabilityManifest(manifest, label) {
                     message: `${label}: cli adapter executionTarget.launcher.command must be a string when launcher is declared`
                 });
             }
+            if (manifest.executionTarget.cwd !== undefined) {
+                const cwd = manifest.executionTarget.cwd;
+                const validString = typeof cwd === "string";
+                const validObject =
+                    typeof cwd === "object" &&
+                    !Array.isArray(cwd) &&
+                    typeof cwd.path === "string" &&
+                    (cwd.relativeTo === undefined ||
+                        cwd.relativeTo === "workspace" ||
+                        cwd.relativeTo === "process");
+                if (!validString && !validObject) {
+                    issues.push({
+                        severity: "error",
+                        message: `${label}: cli adapter executionTarget.cwd must be a string or { path, relativeTo } object`
+                    });
+                }
+            }
         }
     }
 
