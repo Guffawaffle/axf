@@ -186,7 +186,7 @@ function normalizeFamilyManifest(manifest, label) {
 
 // Build the capability records the registry exposes for a family.
 // Skips commands whose synthesized id is already declared (materialized).
-export function synthesizeFamilyCapabilities(family, { existingIds }) {
+export function synthesizeFamilyCapabilities(family, { existingIds, origin = "imported" }) {
     const out = [];
     const scope = family.scope ?? "global";
     const idPrefix = scope === "workspace-local" ? "workspace" : "global";
@@ -217,7 +217,8 @@ export function synthesizeFamilyCapabilities(family, { existingIds }) {
                 manifestPath: family.manifestPath
             },
             manifestPath: family.manifestPath,
-            origin: "imported"
+            origin,
+            provenance: family.provenance
         });
     }
     return out;

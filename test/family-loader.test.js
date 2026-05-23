@@ -295,3 +295,98 @@ test("framework repo ships the standard Lex family pack", async () => {
   const search = registry.getCapability("global.lex.search");
   assert.deepEqual(search.argsSchema.required, ["query"]);
 });
+
+test("external workspace can use framework Lex globals without copied manifests", async () => {
+  const root = await bootstrap();
+  await writeFile(
+    path.join(root, "manifests", "capabilities", "workspace.repo.echo.json"),
+    JSON.stringify(
+      {
+        manifestVersion: "axf/v0",
+        id: "workspace.repo.echo",
+        summary: "workspace echo",
+        provider: "repo",
+        adapterType: "internal",
+        executionTarget: { handler: "echo.say" },
+        argsSchema: {
+          type: "object",
+          properties: { message: { type: "string" } },
+        },
+        outputModes: ["json"],
+        sideEffects: "none",
+        scope: "workspace-local",
+        lifecycleState: "active",
+        defaults: {},
+        policies: [],
+        owner: "test",
+      },
+      null,
+      2,
+    ),
+  );
+
+  const listed = JSON.parse(
+    await captureStdout(() =>
+      main(["--workspace", root, "list", "--all", "--json"]),
+    ),
+  );
+  const byId = new Map(listed.capabilities.map((cap) => [cap.id, cap]));
+  assert.ok(byId.has("workspace.repo.echo"));
+  assert.equal(byId.get("global.lex.recall")?.sideEffects, "read");
+  assert.equal(byId.get("global.lex.remember")?.sideEffects, "write");
+
+  const recall = JSON.parse(
+    await captureStdout(() =>
+      main(["--workspace", root, "inspect", "global.lex.recall", "--json"]),
+    ),
+  );
+  assert.equal(recall.capability.id, "global.lex.recall");
+  assert.equal(recall.capability.sideEffects, "read");
+  assert.equal(recall.adapter.provenance, "framework");
+
+  const remember = JSON.parse(
+    await captureStdout(() =>
+      main(["--workspace", root, "inspect", "global.lex.remember", "--json"]),
+    ),
+  );
+  assert.equal(remember.capability.id, "global.lex.remember");
+  assert.equal(remember.capability.sideEffects, "write");
+
+  const workspaceRun = JSON.parse(
+    await captureStdout(() =>
+      main([
+        "--workspace",
+        root,
+        "run",
+        "repo",
+        "echo",
+        "--message",
+        "hi",
+        "--json",
+      ]),
+    ),
+  );
+  assert.equal(workspaceRun.ok, true);
+  assert.equal(workspaceRun.data, "hi");
+  assert.equal(workspaceRun.meta.capabilityId, "workspace.repo.echo");
+
+  const doctor = JSON.parse(
+    await captureStdout(() =>
+      main(["--workspace", root, "doctor", "--json"]),
+    ),
+  );
+  assert.equal(doctor.familyCount, 1);
+  assert.ok(
+    doctor.adaptersByType.some(
+      (adapter) => adapter.type === "cli" && adapter.provenance === "framework",
+    ),
+  );
+
+  const scout = JSON.parse(
+    await captureStdout(() =>
+      main(["--workspace", root, "scout", "--check", "--json"]),
+    ),
+  );
+  assert.equal(scout.ok, true);
+  assert.equal(scout.changeCount, 0);
+});

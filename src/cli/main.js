@@ -62,7 +62,10 @@ export async function main(argv, env = {}) {
     return;
   }
 
-  const registry = await createRegistry({ rootDir });
+  const registry = await createRegistry({
+    rootDir,
+    enableFrameworkGlobals: ws.viaMarker,
+  });
 
   if (command === "list") {
     await listCommand(registry, rest, ws, { cwd });
