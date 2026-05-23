@@ -93,7 +93,7 @@ function buildExecutableSuffixes(command, { env, platform }) {
     .map((ext) => ext.trim())
     .filter(Boolean);
 
-  return [command, ...pathext.map((ext) => `${command}${ext}`)];
+  return [...pathext.map((ext) => `${command}${ext}`), command];
 }
 
 function splitPathEntries(pathValue, platform) {

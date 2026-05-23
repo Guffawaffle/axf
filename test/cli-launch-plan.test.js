@@ -291,6 +291,40 @@ test("cli invocation wraps Windows npm cmd shims through cmd.exe", () => {
   }
 });
 
+test("cli invocation prefers Windows npm cmd shim over extensionless shim", () => {
+  const env = {
+    PATH: ["C:\\Users\\dev\\AppData\\Roaming\\npm"].join(";"),
+    PATHEXT: ".COM;.EXE;.BAT;.CMD",
+    ComSpec: "C:\\Windows\\System32\\cmd.exe",
+  };
+
+  const originalExists = globalThis.__AXF_TEST_FILE_EXISTS;
+  globalThis.__AXF_TEST_FILE_EXISTS = (candidate) =>
+    candidate.endsWith("lex") || candidate.endsWith("lex.CMD");
+  try {
+    const invocation = prepareCommandInvocation("lex", ["introspect"], {
+      env,
+      platform: "win32",
+    });
+
+    assert.equal(invocation.command, "C:\\Windows\\System32\\cmd.exe");
+    assert.deepEqual(invocation.args, [
+      "/d",
+      "/s",
+      "/c",
+      "C:\\Users\\dev\\AppData\\Roaming\\npm\\lex.CMD",
+      "introspect",
+    ]);
+    assert.equal(
+      invocation.resolvedCommand,
+      "C:\\Users\\dev\\AppData\\Roaming\\npm\\lex.CMD",
+    );
+    assert.equal(invocation.launchStrategy, "windows-cmd-shim");
+  } finally {
+    globalThis.__AXF_TEST_FILE_EXISTS = originalExists;
+  }
+});
+
 async function bootstrapWorkspace(root) {
   await writeFile(
     path.join(root, "axf.workspace.json"),

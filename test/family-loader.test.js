@@ -371,9 +371,7 @@ test("external workspace can use framework Lex globals without copied manifests"
   assert.equal(workspaceRun.meta.capabilityId, "workspace.repo.echo");
 
   const doctor = JSON.parse(
-    await captureStdout(() =>
-      main(["--workspace", root, "doctor", "--json"]),
-    ),
+    await captureStdout(() => main(["--workspace", root, "doctor", "--json"])),
   );
   assert.equal(doctor.familyCount, 1);
   assert.ok(
