@@ -5,10 +5,12 @@
   "type": "module",
   "description": "Manifest-driven axf launcher and toolspace framework prototype.",
   "bin": {
-    "axf": "./bin/axf.js"
+    "axf": "./bin/axf.js",
+    "axf-mcp": "./bin/axf-mcp.js"
   },
   "scripts": {
     "axf": "node bin/axf.js",
+    "axf-mcp": "node bin/axf-mcp.js",
     "test": "node --test"
   },
   "engines": {
