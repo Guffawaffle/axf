@@ -240,6 +240,8 @@ async function inspectCommand(
   if (cap.policies?.length > 0) {
     console.log(`policies: ${cap.policies.join(", ")}`);
   }
+  printMetadataField("warnings", cap.warnings);
+  printMetadataField("details", cap.details);
   if (
     resolved.injectedDefaults &&
     Object.keys(resolved.injectedDefaults).length > 0
@@ -419,7 +421,8 @@ async function initMaterialize(rootDir, args) {
       2,
     );
   }
-  const { computeArgMap } = await import("../core/family-loader.js");
+  const { computeArgMap, copyDescriptiveMetadata } =
+    await import("../core/family-loader.js");
   const argMap = computeArgMap(cmd.args ?? {}, family);
   const scope = family.scope ?? "global";
   const idPrefix = scope === "workspace-local" ? "workspace" : "global";
@@ -464,10 +467,43 @@ async function initMaterialize(rootDir, args) {
   if (cmd.providerAdapter ?? family.providerAdapter) {
     manifest.providerAdapter = cmd.providerAdapter ?? family.providerAdapter;
   }
+  copyDescriptiveMetadata(manifest, cmd);
   await writeJsonFile(filePath, manifest);
   console.log(
     `materialized ${familyName}.${commandKey} -> ${path.relative(rootDir, filePath)}`,
   );
+}
+
+function printMetadataField(label, value) {
+  if (value === undefined) return;
+
+  if (typeof value === "string") {
+    console.log(`${label}: ${value}`);
+    return;
+  }
+
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    if (value.length === 0) {
+      console.log(`${label}: []`);
+      return;
+    }
+    console.log(`${label}:`);
+    for (const item of value) {
+      console.log(`  - ${item}`);
+    }
+    return;
+  }
+
+  const rendered = JSON.stringify(value, null, 2);
+  if (!rendered?.includes("\n")) {
+    console.log(`${label}: ${rendered}`);
+    return;
+  }
+
+  console.log(`${label}:`);
+  for (const line of rendered.split("\n")) {
+    console.log(`  ${line}`);
+  }
 }
 
 async function initToolspace(rootDir, name) {

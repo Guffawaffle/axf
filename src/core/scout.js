@@ -2,7 +2,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { AxError } from "./errors.js";
-import { RESERVED_ARG_NAMES, computeArgMap } from "./family-loader.js";
+import {
+  RESERVED_ARG_NAMES,
+  computeArgMap,
+  copyDescriptiveMetadata,
+} from "./family-loader.js";
 import { prepareCommandInvocation } from "./command-invocation.js";
 
 const SUPPORTED_IMPORT_KINDS = new Set(["ax-inventory"]);
@@ -277,7 +281,7 @@ function buildFamilyManifest({ importSource, inventory, existingFamily }) {
     const commandName = toKebab(providerCommandName);
     const existingCommand = existingFamily?.commands?.[commandName] ?? {};
     const args = buildArgs(axCommand, existingCommand);
-    family.commands[commandName] = {
+    const familyCommand = {
       summary:
         existingCommand.summary ??
         axCommand.description ??
@@ -291,6 +295,8 @@ function buildFamilyManifest({ importSource, inventory, existingFamily }) {
         axCommand.sideEffects ?? existingCommand.sideEffects ?? "unknown",
       args,
     };
+    copyDescriptiveMetadata(familyCommand, existingCommand, axCommand);
+    family.commands[commandName] = familyCommand;
     for (const key of [
       "outputModes",
       "defaults",
@@ -417,6 +423,7 @@ function buildStandaloneCapability({
       existingCapability?.argMap ??
       computeArgMap(command.args ?? {}, familyManifest),
   };
+  copyDescriptiveMetadata(manifest, existingCapability, command);
   if (existingCapability?.sourceFamily) {
     manifest.sourceFamily = existingCapability.sourceFamily;
   }

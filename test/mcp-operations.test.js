@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { performOperation } from "../src/mcp/operations.js";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
@@ -14,11 +17,30 @@ test("axf help explains the single-tool router contract", async () => {
   assert.equal(result.operation, "help");
   assert.equal(result.tool.name, "axf");
   assert.equal(result.contract.capabilitiesAreSeparateTools, false);
-  assert.equal(result.contract.capabilityExamples.includes("global.lex.status"), true);
-  assert.equal(result.contract.capabilityExamples.includes("global.stfc-mod.status"), true);
-  assert.match(result.contract.registryLifecycle.mcpReloadBehavior, /per request/);
-  assert.equal(result.examples.some((example) => example.title === "inspect global.lex.status"), true);
-  assert.equal(result.examples.some((example) => example.title === "run global.lex.status"), true);
+  assert.equal(
+    result.contract.capabilityExamples.includes("global.lex.status"),
+    true,
+  );
+  assert.equal(
+    result.contract.capabilityExamples.includes("global.stfc-mod.status"),
+    true,
+  );
+  assert.match(
+    result.contract.registryLifecycle.mcpReloadBehavior,
+    /per request/,
+  );
+  assert.equal(
+    result.examples.some(
+      (example) => example.title === "inspect global.lex.status",
+    ),
+    true,
+  );
+  assert.equal(
+    result.examples.some(
+      (example) => example.title === "run global.lex.status",
+    ),
+    true,
+  );
 });
 
 test("axf list returns discovered capabilities", async () => {
@@ -29,7 +51,11 @@ test("axf list returns discovered capabilities", async () => {
 
   assert.equal(result.ok, true);
   assert.equal(result.operation, "list");
-  assert.ok(result.capabilities.some((capability) => capability.id === "global.echo.say"));
+  assert.ok(
+    result.capabilities.some(
+      (capability) => capability.id === "global.echo.say",
+    ),
+  );
 });
 
 test("axf inspect returns capability metadata", async () => {
@@ -44,6 +70,53 @@ test("axf inspect returns capability metadata", async () => {
   assert.equal(result.capability.id, "global.echo.say");
   assert.equal(result.capability.adapterType, "internal");
   assert.equal(result.capability.provider, "echo");
+});
+
+test("axf inspect preserves synthesized warnings/details in MCP responses", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "axf-mcp-meta-"));
+  await mkdir(path.join(root, "manifests", "families"), { recursive: true });
+  await writeFile(path.join(root, "axf.workspace.json"), "{}\n");
+  await writeFile(
+    path.join(root, "manifests", "families", "demo.family.json"),
+    `${JSON.stringify(
+      {
+        manifestVersion: "axf/v0",
+        family: "demo",
+        scope: "global",
+        provider: "demo",
+        adapterType: "cli",
+        executionTarget: { command: "demo" },
+        lifecycleState: "active",
+        owner: "test",
+        outputModes: ["json"],
+        sideEffects: "read",
+        commands: {
+          status: {
+            summary: "Show demo status",
+            executionTarget: { command: "demo", args: ["status"] },
+            warnings: ["Inspect before reading native logs"],
+            details: { logPath: "logs/demo.log" },
+            args: {},
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  const result = await performOperation({
+    operation: "inspect",
+    workspace: root,
+    target: { id: "global.demo.status" },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.capability.id, "global.demo.status");
+  assert.deepEqual(result.capability.warnings, [
+    "Inspect before reading native logs",
+  ]);
+  assert.deepEqual(result.capability.details, { logPath: "logs/demo.log" });
 });
 
 test("axf run succeeds for a harmless known AXF capability", async () => {

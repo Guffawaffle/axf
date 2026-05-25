@@ -11,6 +11,7 @@ import {
   validateFamilyManifest,
   RESERVED_ARG_NAMES,
 } from "../src/core/family-loader.js";
+import { evaluatePolicies } from "../src/core/policy.js";
 import { main } from "../src/cli/main.js";
 
 async function bootstrap() {
@@ -66,6 +67,11 @@ const SAMPLE_GIT_FAMILY = {
     status: {
       summary: "Show working tree status",
       executionTarget: { command: "git", args: ["status"] },
+      warnings: ["Native log access required for full status"],
+      details: {
+        logPath: "logs/native.log",
+        summaryMode: "summary",
+      },
       args: {
         porcelain: { type: "boolean" },
         branch: { type: "string", providerFlag: "--branch" },
@@ -92,6 +98,48 @@ test("family loader synthesizes capabilities for each command", async () => {
   assert.equal(status.origin, "imported");
   assert.equal(status.sourceFamily.family, "git");
   assert.equal(status.sourceFamily.command, "status");
+  assert.deepEqual(status.warnings, [
+    "Native log access required for full status",
+  ]);
+  assert.deepEqual(status.details, {
+    logPath: "logs/native.log",
+    summaryMode: "summary",
+  });
+});
+
+test("list JSON preserves synthesized metadata while plain list stays terse and inspect shows it", async () => {
+  const root = await bootstrap();
+  await writeFamily(root, "git", SAMPLE_GIT_FAMILY);
+
+  const listed = JSON.parse(
+    await captureStdout(() =>
+      main(["--workspace", root, "list", "--all", "--json"]),
+    ),
+  );
+  const listedStatus = listed.capabilities.find(
+    (capability) => capability.id === "global.git.status",
+  );
+  assert.deepEqual(listedStatus.warnings, [
+    "Native log access required for full status",
+  ]);
+  assert.deepEqual(listedStatus.details, {
+    logPath: "logs/native.log",
+    summaryMode: "summary",
+  });
+
+  const textList = await captureStdout(() =>
+    main(["--workspace", root, "list", "--all"]),
+  );
+  assert.doesNotMatch(textList, /Native log access required/);
+  assert.doesNotMatch(textList, /logs\/native\.log/);
+
+  const inspectText = await captureStdout(() =>
+    main(["--workspace", root, "inspect", "git", "status"]),
+  );
+  assert.match(inspectText, /warnings:/);
+  assert.match(inspectText, /Native log access required for full status/);
+  assert.match(inspectText, /details:/);
+  assert.match(inspectText, /logs\/native\.log/);
 });
 
 test("family lifecycle alias 'stable' is treated as active for imported runs", async () => {
@@ -269,6 +317,36 @@ test("init materialize writes a real capability file from a family entry", async
     manifestPath: "manifests/families/git.family.json",
   });
   assert.equal(manifest.argMap.branch, "--branch");
+  assert.deepEqual(manifest.warnings, [
+    "Native log access required for full status",
+  ]);
+  assert.deepEqual(manifest.details, {
+    logPath: "logs/native.log",
+    summaryMode: "summary",
+  });
+});
+
+test("synthesized capability metadata does not make unknown policies inert", async () => {
+  const root = await bootstrap();
+  const family = structuredClone(SAMPLE_GIT_FAMILY);
+  family.commands.status.policies = ["nonexistent"];
+  await writeFamily(root, "git", family);
+
+  const registry = await createRegistry({ rootDir: root });
+  const status = registry.getCapability("global.git.status");
+  const result = evaluatePolicies(status, {
+    workspace: { root, viaMarker: true, source: "explicit" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors[0], /unknown policy 'nonexistent'/);
+  assert.deepEqual(status.warnings, [
+    "Native log access required for full status",
+  ]);
+  assert.deepEqual(status.details, {
+    logPath: "logs/native.log",
+    summaryMode: "summary",
+  });
 });
 
 test("framework repo ships the standard Lex family pack", async () => {

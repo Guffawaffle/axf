@@ -36,6 +36,8 @@ const SUPPORTED_ARG_STYLES = new Set([
 const SUPPORTED_SCOPES = new Set(["global", "workspace-local"]);
 const LIFECYCLE_ALIASES = new Map([["stable", "active"]]);
 
+const DESCRIPTIVE_METADATA_KEYS = ["warnings", "details"];
+
 // Args the framework reserves for itself. A family or capability that
 // declares one of these as a public arg is rejected, because the CLI
 // would have no way to disambiguate them at the command line.
@@ -208,7 +210,7 @@ export function synthesizeFamilyCapabilities(
     const id = `${idPrefix}.${family.family}.${cmdKey}`;
     if (existingIds.has(id)) continue; // materialized override wins
     const argMap = computeArgMap(cmd.args ?? {}, family);
-    out.push({
+    const capability = {
       manifestVersion: "axf/v0",
       id,
       summary: cmd.summary ?? `${family.family} ${cmdKey}`,
@@ -233,9 +235,21 @@ export function synthesizeFamilyCapabilities(
       manifestPath: family.manifestPath,
       origin,
       provenance: family.provenance,
-    });
+    };
+    copyDescriptiveMetadata(capability, cmd);
+    out.push(capability);
   }
   return out;
+}
+
+export function copyDescriptiveMetadata(target, ...sources) {
+  for (const key of DESCRIPTIVE_METADATA_KEYS) {
+    const source = sources.find((candidate) => candidate?.[key] !== undefined);
+    if (source) {
+      target[key] = source[key];
+    }
+  }
+  return target;
 }
 
 // Build a minimal argsSchema from an args descriptor. The family format

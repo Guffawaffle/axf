@@ -45,6 +45,11 @@ const inventory = {
       description: "Show demo status",
       script: "Get-Status.ps1",
       sideEffects: "read",
+      warnings: ["Provider inventory detected partial log coverage"],
+      details: {
+        inventorySource: "provider",
+        logFile: "demo.log"
+      },
       parameters: [
         { name: "Summary", type: "SwitchParameter", switch: true }
       ]
@@ -54,6 +59,11 @@ const inventory = {
       description: "Query demo logs",
       script: "Search-Log.ps1",
       sideEffects: "read",
+      warnings: ["Large log scans may be slow"],
+      details: {
+        inventorySource: "provider",
+        queryMode: "full"
+      },
       parameters: [
         { name: "Profile", type: "String", switch: false },
         { name: "All", type: "SwitchParameter", switch: true },
@@ -137,6 +147,13 @@ test("scout checks and writes ax inventory imports", async () => {
     family.commands.status.argsSchema.properties.summary.type,
     "boolean",
   );
+  assert.deepEqual(family.commands.status.warnings, [
+    "Provider inventory detected partial log coverage",
+  ]);
+  assert.deepEqual(family.commands.status.details, {
+    inventorySource: "provider",
+    logFile: "demo.log",
+  });
   assert.equal(
     family.commands["log-query"],
     undefined,
@@ -161,6 +178,11 @@ test("scout checks and writes ax inventory imports", async () => {
   ]);
   assert.equal(logQuery.argMap.all, "-All");
   assert.equal(logQuery.argMap.last, "-Last");
+  assert.deepEqual(logQuery.warnings, ["Large log scans may be slow"]);
+  assert.deepEqual(logQuery.details, {
+    inventorySource: "provider",
+    queryMode: "full",
+  });
   assert.equal(
     logQuery.sourceFamily,
     undefined,
@@ -168,8 +190,17 @@ test("scout checks and writes ax inventory imports", async () => {
   );
 
   const registry = await createRegistry({ rootDir: root });
-  assert.ok(registry.getCapability("global.demo.status"));
-  assert.ok(registry.getCapability("global.demo.log-query"));
+  const status = registry.getCapability("global.demo.status");
+  const logQueryCapability = registry.getCapability("global.demo.log-query");
+  assert.ok(status);
+  assert.ok(logQueryCapability);
+  assert.deepEqual(status.warnings, [
+    "Provider inventory detected partial log coverage",
+  ]);
+  assert.deepEqual(logQueryCapability.details, {
+    inventorySource: "provider",
+    queryMode: "full",
+  });
 });
 
 test("scout rejects check and write together", async () => {
