@@ -36,7 +36,8 @@ export const AXF_TOOL = {
       },
       args: {
         type: "object",
-        description: "Capability arguments passed into AXF's existing validation and execution path.",
+        description:
+          "Capability arguments passed into AXF's existing validation and execution path.",
       },
       includeDrafts: {
         type: "boolean",
@@ -187,7 +188,9 @@ export function startStdioServer(options = {}) {
   }
 
   function readContentLengthMessage() {
-    const prefix = buffer.subarray(0, Math.min(buffer.length, 32)).toString("utf8");
+    const prefix = buffer
+      .subarray(0, Math.min(buffer.length, 32))
+      .toString("utf8");
     if (!/^Content-Length:/i.test(prefix)) {
       return { status: "not-frame" };
     }
@@ -222,7 +225,8 @@ export function startStdioServer(options = {}) {
       return null;
     }
 
-    const lineEnd = lfIndex > 0 && buffer[lfIndex - 1] === 0x0d ? lfIndex - 1 : lfIndex;
+    const lineEnd =
+      lfIndex > 0 && buffer[lfIndex - 1] === 0x0d ? lfIndex - 1 : lfIndex;
     const text = buffer.subarray(0, lineEnd).toString("utf8").trim();
     buffer = buffer.subarray(lfIndex + 1);
     return { text };
