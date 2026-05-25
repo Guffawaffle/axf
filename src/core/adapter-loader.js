@@ -380,6 +380,7 @@ export function validateAdapterManifest(manifest, label) {
   }
 
   return issues;
+}
 
 export function getAdapterOrThrow(adapterRegistry, adapterType) {
   const adapter = adapterRegistry.get(adapterType);
