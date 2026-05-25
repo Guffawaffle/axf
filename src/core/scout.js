@@ -235,7 +235,6 @@ function spawnCapture(command, args, { cwd, env }) {
 }
 
 function buildFamilyManifest({
-  rootDir,
   importSource,
   inventory,
   existingFamily,
@@ -454,7 +453,7 @@ function mergeArgsSchema(generated, existing) {
 
 async function collectJsonChange(
   changes,
-  { rootDir, path: filePath, kind, family, command = null, manifest },
+  { path: filePath, kind, family, command = null, manifest },
 ) {
   const expectedJson = stableJson(manifest);
   const current = await readTextIfExists(filePath);

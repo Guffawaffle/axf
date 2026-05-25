@@ -10,3 +10,6 @@ npm-debug.log*
 
 # OS/editor noise
 .DS_Store
+
+# Repo-local VS Code MCP launcher config
+.vscode/mcp.json
