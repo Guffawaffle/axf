@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.smartergpt/axf",
+  "title": "AXF",
+  "description": "Manifest-driven AXF capability router for workspace MCP access.",
+  "repository": {
+    "url": "https://github.com/Guffawaffle/ax-framework",
+    "source": "github"
+  },
+  "version": "0.1.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@smartergpt/axf",
+      "version": "0.1.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimes": ["node"],
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "AXF_WORKSPACE",
+          "description": "Root directory for the AXF workspace. Defaults to current working directory.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
