@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { main } from "../src/cli/main.js";
 import { createRegistry } from "../src/core/registry.js";
+import { evaluatePolicies } from "../src/core/policy.js";
 
 async function bootstrap() {
   const root = await mkdtemp(path.join(os.tmpdir(), "axf-scout-"));
@@ -45,10 +46,12 @@ const inventory = {
       description: "Show demo status",
       script: "Get-Status.ps1",
       sideEffects: "read",
-      warnings: ["Provider inventory detected partial log coverage"],
-      details: {
-        inventorySource: "provider",
-        logFile: "demo.log"
+      metadata: {
+        warnings: ["Provider inventory detected partial log coverage"],
+        details: {
+          inventorySource: "provider",
+          logFile: "demo.log"
+        }
       },
       parameters: [
         { name: "Summary", type: "SwitchParameter", switch: true }
@@ -59,10 +62,12 @@ const inventory = {
       description: "Query demo logs",
       script: "Search-Log.ps1",
       sideEffects: "read",
-      warnings: ["Large log scans may be slow"],
-      details: {
-        inventorySource: "provider",
-        queryMode: "full"
+      metadata: {
+        warnings: ["Large log scans may be slow"],
+        details: {
+          inventorySource: "provider",
+          queryMode: "full"
+        }
       },
       parameters: [
         { name: "Profile", type: "String", switch: false },
@@ -98,6 +103,7 @@ console.log(JSON.stringify(inventory));
           },
           additionalProperties: false,
         },
+        policies: ["nonexistent"],
       },
       null,
       2,
@@ -119,6 +125,97 @@ function captureStdout(fn) {
     })
     .then(() => chunks.join(""));
 }
+
+test("scout --write preserves nested provider metadata in written files and reloads it", async () => {
+  const root = await bootstrap();
+
+  await assert.rejects(
+    () => main(["--workspace", root, "scout", "--check"]),
+    /scout detected manifest drift/,
+  );
+
+  await captureStdout(() => main(["--workspace", root, "scout", "--write"]));
+
+  const family = JSON.parse(
+    await readFile(
+      path.join(root, "manifests", "families", "demo.family.json"),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(family.commands.status.warnings, [
+    "Provider inventory detected partial log coverage",
+  ]);
+  assert.deepEqual(family.commands.status.details, {
+    inventorySource: "provider",
+    logFile: "demo.log",
+  });
+
+  const logQuery = JSON.parse(
+    await readFile(
+      path.join(
+        root,
+        "manifests",
+        "capabilities",
+        "global.demo.log-query.json",
+      ),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(logQuery.warnings, ["Large log scans may be slow"]);
+  assert.deepEqual(logQuery.details, {
+    inventorySource: "provider",
+    queryMode: "full",
+  });
+
+  const registry = await createRegistry({ rootDir: root });
+  const status = registry.getCapability("global.demo.status");
+  const logQueryCapability = registry.getCapability("global.demo.log-query");
+  assert.deepEqual(status.warnings, [
+    "Provider inventory detected partial log coverage",
+  ]);
+  assert.deepEqual(logQueryCapability.details, {
+    inventorySource: "provider",
+    queryMode: "full",
+  });
+
+  const inspectStatus = JSON.parse(
+    await captureStdout(() =>
+      main(["--workspace", root, "inspect", "demo", "status", "--json"]),
+    ),
+  );
+  assert.deepEqual(inspectStatus.capability.warnings, [
+    "Provider inventory detected partial log coverage",
+  ]);
+  assert.deepEqual(inspectStatus.capability.details, {
+    inventorySource: "provider",
+    logFile: "demo.log",
+  });
+
+  const inspectLogQuery = JSON.parse(
+    await captureStdout(() =>
+      main([
+        "--workspace",
+        root,
+        "inspect",
+        "global.demo.log-query",
+        "--json",
+      ]),
+    ),
+  );
+  assert.deepEqual(inspectLogQuery.capability.warnings, [
+    "Large log scans may be slow",
+  ]);
+  assert.deepEqual(inspectLogQuery.capability.details, {
+    inventorySource: "provider",
+    queryMode: "full",
+  });
+
+  const policyResult = evaluatePolicies(logQueryCapability, {
+    workspace: { root, viaMarker: true, source: "explicit" },
+  });
+  assert.equal(policyResult.ok, false);
+  assert.match(policyResult.errors[0], /unknown policy 'nonexistent'/);
+});
 
 test("scout checks and writes ax inventory imports", async () => {
   const root = await bootstrap();

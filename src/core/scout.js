@@ -295,7 +295,7 @@ function buildFamilyManifest({ importSource, inventory, existingFamily }) {
         axCommand.sideEffects ?? existingCommand.sideEffects ?? "unknown",
       args,
     };
-    copyDescriptiveMetadata(familyCommand, existingCommand, axCommand);
+    copyScoutDescriptiveMetadata(familyCommand, existingCommand, axCommand);
     family.commands[commandName] = familyCommand;
     for (const key of [
       "outputModes",
@@ -423,11 +423,28 @@ function buildStandaloneCapability({
       existingCapability?.argMap ??
       computeArgMap(command.args ?? {}, familyManifest),
   };
-  copyDescriptiveMetadata(manifest, existingCapability, command);
+  copyScoutDescriptiveMetadata(manifest, existingCapability, command);
   if (existingCapability?.sourceFamily) {
     manifest.sourceFamily = existingCapability.sourceFamily;
   }
   return manifest;
+}
+
+function copyScoutDescriptiveMetadata(target, ...sources) {
+  const candidates = [];
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+    candidates.push(source);
+    if (
+      source.metadata &&
+      typeof source.metadata === "object" &&
+      !Array.isArray(source.metadata)
+    ) {
+      candidates.push(source.metadata);
+    }
+  }
+
+  return copyDescriptiveMetadata(target, ...candidates);
 }
 
 function mergeArgsSchema(generated, existing) {
