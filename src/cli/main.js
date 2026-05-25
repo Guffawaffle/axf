@@ -11,6 +11,7 @@ import { AxError } from "../core/errors.js";
 import { resolveCliLaunchPlan } from "../core/cli-launch-plan.js";
 import { prepareCommandInvocation } from "../core/command-invocation.js";
 import { scoutWorkspace } from "../core/scout.js";
+import { startStdioServer } from "../mcp/server.js";
 import {
   collectRuntimeDiagnostics,
   summarizeWorkspaceBinding,
@@ -25,6 +26,7 @@ const COMMANDS = new Set([
   "promote",
   "demote",
   "scout",
+  "mcp",
   "help",
 ]);
 
@@ -59,6 +61,13 @@ export async function main(argv, env = {}) {
   }
   if (command === "scout") {
     await scoutCommand(rootDir, rest, processEnv);
+    return;
+  }
+  if (command === "mcp") {
+    const serverEnv = workspace
+      ? { ...processEnv, AXF_WORKSPACE: ws.root }
+      : processEnv;
+    startStdioServer({ cwd, env: serverEnv });
     return;
   }
 
@@ -813,6 +822,7 @@ Usage:
     axf demote <id> --to <draft|reviewed> [--json]
     axf scout [--check|--write] [--json]
     axf doctor [--json]
+    axf mcp
 
 Lifecycle flag:
   --any-lifecycle        Allow non-active capabilities to run/list (canonical).
@@ -828,6 +838,7 @@ Examples:
     axf init adapter --kind provider acme --composes cli
     axf promote global.acme.status --to active
     axf scout --check
+    axf mcp
 `);
 }
 

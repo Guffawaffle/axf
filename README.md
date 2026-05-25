@@ -27,12 +27,15 @@ separate written license.
 
 The npm package name is `@smartergpt/axf`. It installs two bins:
 
-- `axf` — the CLI entrypoint
+- `axf` — the CLI entrypoint, including the stdio MCP launch subcommand `axf mcp`
 - `axf-mcp` — the stdio MCP server entrypoint
 
-MCP clients should launch `axf-mcp`. The server exposes exactly one MCP
-tool named `axf`, and that tool routes into AXF's existing capability
-surface for the bound workspace.
+MCP clients may launch `axf-mcp` directly. For registry-driven or
+package-driven launch, prefer `axf mcp` so the package can stay centered
+on the base `axf` command surface. Both entrypoints start the same stdio
+MCP server. The server exposes exactly one MCP tool named `axf`, and
+that tool routes into AXF's existing capability surface for the bound
+workspace.
 
 ### Global install
 
@@ -44,6 +47,7 @@ Then use either bin directly:
 
 ```sh
 axf doctor
+axf mcp
 axf-mcp
 ```
 
@@ -53,10 +57,30 @@ From a local clone, run the bins directly with Node:
 
 ```sh
 node /path/to/ax-framework/bin/axf.js doctor
+node /path/to/ax-framework/bin/axf.js mcp
 node /path/to/ax-framework/bin/axf-mcp.js
 ```
 
-A repo-local MCP configuration looks like this:
+A repo-local MCP configuration can either call the direct MCP bin or the
+CLI subcommand. Prefer the CLI subcommand when the client supports
+command arguments cleanly:
+
+```json
+{
+  "mcpServers": {
+    "axf": {
+      "command": "node",
+      "args": ["/path/to/ax-framework/bin/axf.js", "mcp"],
+      "cwd": "/path/to/workspace",
+      "env": {
+        "AXF_WORKSPACE": "/path/to/workspace"
+      }
+    }
+  }
+}
+```
+
+Direct-bin configs remain valid:
 
 ```json
 {
@@ -75,21 +99,46 @@ A repo-local MCP configuration looks like this:
 
 ### npm / npx launch
 
-The published-package launch shape was validated locally with the packed
-tarball using these equivalent forms:
+Published-package smoke tests must run from a clean directory such as
+`/tmp`, not from the AXF repo root. Running from the repo root can let
+`npx` or `npm exec` pick up a repo-local or globally installed `axf`
+binary instead of the package-installed one.
+
+The registry-friendly launch shape is `axf mcp`, but the direct MCP bin
+remains valid for manual configurations. These equivalent forms were
+validated locally with the packed tarball:
 
 ```sh
 npx -y --package @smartergpt/axf axf doctor
+npx -y --package @smartergpt/axf axf mcp
 npx -y --package @smartergpt/axf axf-mcp
 
 npm exec --yes --package @smartergpt/axf -- axf doctor
+npm exec --yes --package @smartergpt/axf -- axf mcp
 npm exec --yes --package @smartergpt/axf -- axf-mcp
 ```
 
 ### Windows-native launch
 
-For npm-installed Windows shims, use the `.cmd` entrypoints in MCP
-configs:
+For registry-style Windows MCP configs, prefer the base `axf.cmd`
+launcher with `mcp` as an argument:
+
+```json
+{
+  "mcpServers": {
+    "axf": {
+      "command": "axf.cmd",
+      "args": ["mcp"],
+      "cwd": "C:\\src\\my-workspace",
+      "env": {
+        "AXF_WORKSPACE": "C:\\src\\my-workspace"
+      }
+    }
+  }
+}
+```
+
+Direct-bin `.cmd` configs are still valid:
 
 ```json
 {
@@ -108,7 +157,25 @@ configs:
 
 ### WSL / Linux launch
 
-Use the native binary and bind the target workspace explicitly:
+For registry-style WSL/Linux MCP configs, prefer the base `axf` command
+with `mcp` as the first argument:
+
+```json
+{
+  "mcpServers": {
+    "axf": {
+      "command": "axf",
+      "args": ["mcp"],
+      "cwd": "/home/user/src/my-workspace",
+      "env": {
+        "AXF_WORKSPACE": "/home/user/src/my-workspace"
+      }
+    }
+  }
+}
+```
+
+Direct-bin configs remain valid:
 
 ```json
 {
@@ -127,7 +194,7 @@ Use the native binary and bind the target workspace explicitly:
 
 ### Workspace binding
 
-`axf` and `axf-mcp` find the active workspace in this order:
+`axf`, `axf mcp`, and `axf-mcp` find the active workspace in this order:
 
 1. explicit `--workspace`
 2. `AXF_WORKSPACE`

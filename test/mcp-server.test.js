@@ -45,8 +45,26 @@ test("tools/call routes run through the single axf tool", async () => {
 });
 
 test("stdio MCP entrypoint serves the single axf tool", async () => {
-  const binPath = path.join(repoRoot, "bin", "axf-mcp.js");
-  const proc = spawn(process.execPath, [binPath], {
+  const response = await requestToolsList([
+    path.join(repoRoot, "bin", "axf-mcp.js"),
+  ]);
+
+  assert.equal(response.result.tools.length, 1);
+  assert.equal(response.result.tools[0].name, "axf");
+});
+
+test("axf mcp serves the same single axf tool", async () => {
+  const response = await requestToolsList([
+    path.join(repoRoot, "bin", "axf.js"),
+    "mcp",
+  ]);
+
+  assert.equal(response.result.tools.length, 1);
+  assert.equal(response.result.tools[0].name, "axf");
+});
+
+async function requestToolsList(args) {
+  const proc = spawn(process.execPath, args, {
     cwd: repoRoot,
     env: { ...process.env, AXF_WORKSPACE: repoRoot },
     stdio: ["pipe", "pipe", "pipe"],
@@ -105,9 +123,8 @@ test("stdio MCP entrypoint serves the single axf tool", async () => {
   proc.kill("SIGTERM");
   await once(proc, "close");
 
-  assert.equal(response.result.tools.length, 1);
-  assert.equal(response.result.tools[0].name, "axf");
-});
+  return response;
+}
 
 function encodeMessage(value) {
   const body = Buffer.from(JSON.stringify(value), "utf8");
