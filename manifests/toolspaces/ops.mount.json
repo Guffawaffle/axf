@@ -6,7 +6,7 @@
     "lex": {
       "source": "global.lex",
       "mode": "proxy",
-      "capabilities": ["recall"]
+      "capabilities": ["status", "introspect", "recall", "search", "policy-check"]
     },
     "majel": {
       "source": "global.majel",

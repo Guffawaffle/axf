@@ -1,0 +1,361 @@
+{
+  "manifestVersion": "axf/v0",
+  "family": "stfc-mod",
+  "scope": "global",
+  "provider": "stfc-mod",
+  "adapterType": "cli",
+  "providerAdapter": "stfc",
+  "providerArgStyle": "double-dash-kebab",
+  "outputModes": ["json"],
+  "sideEffects": "unknown",
+  "lifecycleState": "active",
+  "owner": "module:stfc-mod",
+  "commands": {
+    "help": {
+      "summary": "Show available STFC AXF provider commands",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "help"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "list": {
+      "summary": "Alias of help",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "list"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "status": {
+      "summary": "One-shot health check: git, build, deploy, game, log",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "status"] },
+      "args": {
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "doctor": {
+      "summary": "Check Linux tooling, reference data, paths, build outputs, and config files",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "doctor"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "windows-interop": {
+      "summary": "Check the Windows PowerShell bridge used for build/deploy/cycle",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "windows-interop"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "game-running": {
+      "summary": "Best-effort WSL process check for prime.exe",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "game-running"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "config": {
+      "summary": "Show settings TOML or runtime vars",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "config"] },
+      "args": {
+        "runtime-vars": { "type": "boolean" },
+        "compact": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "build": {
+      "summary": "Build the mod through Windows PowerShell/xmake interop",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "build"] },
+      "args": {
+        "tail": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "deploy": {
+      "summary": "Build, copy, and verify the deployed DLL through Windows interop",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "deploy"] },
+      "args": {
+        "tail": { "type": "integer" }
+      },
+      "sideEffects": "write"
+    },
+    "cycle": {
+      "summary": "Stop/deploy/start the game through Windows interop, then verify postflight",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "cycle"] },
+      "args": {
+        "tail": { "type": "integer" },
+        "stop-timeout-sec": { "type": "integer" },
+        "start-timeout-sec": { "type": "integer" },
+        "boot-timeout-sec": { "type": "integer" },
+        "poll-ms": { "type": "integer" },
+        "error-last": { "type": "integer" }
+      },
+      "sideEffects": "write"
+    },
+    "deploy-status": {
+      "summary": "Compare built and deployed DLL hashes",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "deploy-status"] },
+      "args": {},
+      "sideEffects": "read"
+    },
+    "pure-tests": {
+      "summary": "Configure, build, and run the Linux pure decoder test suite",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "pure-tests"] },
+      "args": {
+        "tail": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "decode-tool": {
+      "summary": "Configure and build the Linux battle-log decode helper",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "decode-tool"] },
+      "args": {
+        "tail": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "battle-log": {
+      "summary": "Decode captured battle probe JSONL journals",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "battle-log"] },
+      "args": {
+        "probe-path": { "type": "string" },
+        "journal-id": { "type": "string" },
+        "compare": { "type": "string" },
+        "segments": { "type": "boolean" },
+        "summary-only": { "type": "boolean" },
+        "feed": { "type": "boolean" },
+        "segment-limit": { "type": "integer" },
+        "battle-type": { "type": "string" },
+        "pretty": { "type": "boolean" },
+        "no-build": { "type": "boolean" },
+        "tail": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "debug-send": {
+      "summary": "Send one live JSON debug request through the file transport",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "debug-send"] },
+      "args": {
+        "cmd": { "type": "string" },
+        "request-json": { "type": "string" },
+        "timeout-sec": { "type": "integer" },
+        "poll-ms": { "type": "integer" }
+      },
+      "sideEffects": "write"
+    },
+    "live-state": {
+      "summary": "Probe named live runtime state surfaces",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "live-state"] },
+      "args": {
+        "view": { "type": "string" },
+        "match": { "type": "string" },
+        "namespace": { "type": "string" },
+        "class-name": { "type": "string" },
+        "pointer": { "type": "string" },
+        "min-count": { "type": "integer" },
+        "max-count": { "type": "integer" },
+        "top": { "type": "integer" },
+        "summary": { "type": "boolean" },
+        "names-only": { "type": "boolean" },
+        "exact": { "type": "boolean" },
+        "timeout-sec": { "type": "integer" },
+        "poll-ms": { "type": "integer" }
+      },
+      "sideEffects": "write"
+    },
+    "recent-events": {
+      "summary": "Read or clear live debug recent-events recap",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "recent-events"] },
+      "args": {
+        "last": { "type": "integer" },
+        "kind": { "type": "string" },
+        "match": { "type": "string" },
+        "exact": { "type": "boolean" },
+        "after-seq": { "type": "integer" },
+        "summary": { "type": "boolean" },
+        "clear": { "type": "boolean" },
+        "timeout-sec": { "type": "integer" },
+        "poll-ms": { "type": "integer" }
+      },
+      "sideEffects": "write"
+    },
+    "log": {
+      "summary": "Unified native log entrypoint with slice/session/errors/boot modes",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "log"] },
+      "args": {
+        "tail": { "type": "integer" },
+        "last": { "type": "integer" },
+        "pattern": { "type": "string" },
+        "case-sensitive": { "type": "boolean" },
+        "raw": { "type": "boolean" },
+        "text-only": { "type": "boolean" },
+        "session": { "type": "boolean" },
+        "errors": { "type": "boolean" },
+        "boot": { "type": "boolean" },
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "log-slice": {
+      "summary": "Tail/filter community_patch.log",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "log-slice"] },
+      "args": {
+        "tail": { "type": "integer" },
+        "last": { "type": "integer" },
+        "pattern": { "type": "string" },
+        "case-sensitive": { "type": "boolean" },
+        "raw": { "type": "boolean" },
+        "text-only": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "log-errors": {
+      "summary": "Show error and warning lines from the log",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "log-errors"] },
+      "args": {
+        "last": { "type": "integer" },
+        "scan-all": { "type": "boolean" },
+        "raw": { "type": "boolean" },
+        "text-only": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "log-boot": {
+      "summary": "Show the last boot sequence with hook install results",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "log-boot"] },
+      "args": {
+        "raw": { "type": "boolean" },
+        "text-only": { "type": "boolean" },
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "log-session": {
+      "summary": "Show post-boot log lines from the current session",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "log-session"] },
+      "args": {
+        "last": { "type": "integer" },
+        "pattern": { "type": "string" },
+        "raw": { "type": "boolean" },
+        "text-only": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "preflight": {
+      "summary": "Aggregate status, boot, and recent log errors",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "preflight"] },
+      "args": {
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "postflight": {
+      "summary": "Aggregate deploy status, boot, and recent log errors",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "postflight"] },
+      "args": {
+        "summary": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "dump-search": {
+      "summary": "Search Il2Cpp dump.cs text",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-search"] },
+      "args": {
+        "pattern": { "type": "string" },
+        "context": { "type": "integer" },
+        "max-results": { "type": "integer" },
+        "case-sensitive": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "dump-index": {
+      "summary": "Rebuild the SQLite dump index using the reference Python parser",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-index"] },
+      "args": {
+        "dump-path": { "type": "string" },
+        "db-path": { "type": "string" },
+        "tail": { "type": "integer" }
+      },
+      "sideEffects": "write"
+    },
+    "dump-stats": {
+      "summary": "Summary stats for the dump index",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-stats"] },
+      "args": {
+        "max-namespaces": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "dump-class": {
+      "summary": "Look up a class by name from the dump index",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-class"] },
+      "args": {
+        "name": { "type": "string" },
+        "exact": { "type": "boolean" },
+        "fts": { "type": "boolean" },
+        "max-results": { "type": "integer" },
+        "members": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "dump-hierarchy": {
+      "summary": "Walk a class inheritance chain from the dump index",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-hierarchy"] },
+      "args": {
+        "class": { "type": "string" },
+        "exact": { "type": "boolean" },
+        "max-results": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "dump-method": {
+      "summary": "Find methods by name, optionally scoped to a class",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-method"] },
+      "args": {
+        "name": { "type": "string" },
+        "class": { "type": "string" },
+        "exact": { "type": "boolean" },
+        "fts": { "type": "boolean" },
+        "max-results": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "dump-enum": {
+      "summary": "Look up an enum and optionally list its values",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-enum"] },
+      "args": {
+        "name": { "type": "string" },
+        "exact": { "type": "boolean" },
+        "max-results": { "type": "integer" },
+        "values": { "type": "boolean" }
+      },
+      "sideEffects": "read"
+    },
+    "dump-offsets": {
+      "summary": "Show field offsets for a class",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-offsets"] },
+      "args": {
+        "class": { "type": "string" },
+        "field": { "type": "string" },
+        "exact": { "type": "boolean" },
+        "max-results": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "dump-fts": {
+      "summary": "FTS5 ranked search across classes, methods, and fields",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "dump-fts"] },
+      "args": {
+        "query": { "type": "string" },
+        "max-results": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    },
+    "investigate": {
+      "summary": "Class investigation: dump info, hierarchy, offsets, and header preview",
+      "executionTarget": { "command": "node", "args": ["/srv/stfc-mod/scripts/axf/stfc-provider.mjs", "investigate"] },
+      "args": {
+        "class": { "type": "string" },
+        "exact": { "type": "boolean" },
+        "max-results": { "type": "integer" },
+        "header-preview-lines": { "type": "integer" }
+      },
+      "sideEffects": "read"
+    }
+  }
+}

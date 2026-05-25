@@ -12,6 +12,12 @@ export function resolveCliLaunchPlan(capability, { runtime = null, env = process
         );
     }
 
+    const workingDirectory = resolveWorkingDirectory(
+        executionTarget.cwd,
+        capability.id,
+        runtime
+    );
+
     const baseArgs = normalizeStringArray(
         executionTarget.args,
         `cli capability '${capability.id}' executionTarget.args`
@@ -28,6 +34,8 @@ export function resolveCliLaunchPlan(capability, { runtime = null, env = process
         return {
             command: executionTarget.command,
             argsPrefix: baseArgs,
+            cwd: workingDirectory.path,
+            cwdSource: workingDirectory.source,
             targetPath: null,
             targetSource: "command",
             executionTarget
@@ -56,6 +64,8 @@ export function resolveCliLaunchPlan(capability, { runtime = null, env = process
         return {
             command: resolvedTarget.path,
             argsPrefix: baseArgs,
+            cwd: workingDirectory.path,
+            cwdSource: workingDirectory.source,
             targetPath: resolvedTarget.path,
             targetSource: resolvedTarget.source,
             executionTarget
@@ -84,10 +94,81 @@ export function resolveCliLaunchPlan(capability, { runtime = null, env = process
     return {
         command: launcher.command,
         argsPrefix: [...launcherArgs, resolvedTarget.path, ...baseArgs],
+        cwd: workingDirectory.path,
+        cwdSource: workingDirectory.source,
         targetPath: resolvedTarget.path,
         targetSource: resolvedTarget.source,
         executionTarget
     };
+}
+
+function resolveWorkingDirectory(cwdSpec, capabilityId, runtime) {
+    const processCwd = runtime?.cwd ?? process.cwd();
+    if (cwdSpec === undefined) {
+        const workspaceRoot = runtime?.workspace?.root;
+        if (workspaceRoot) {
+            return { path: path.resolve(workspaceRoot), source: "workspace" };
+        }
+        return { path: path.resolve(processCwd), source: "process" };
+    }
+
+    if (typeof cwdSpec === "string") {
+        return resolveCwdPath(cwdSpec, "workspace", capabilityId, runtime, processCwd);
+    }
+
+    if (typeof cwdSpec !== "object" || Array.isArray(cwdSpec)) {
+        throw new AxError(
+            `cli capability '${capabilityId}' executionTarget.cwd must be a string or object`,
+            2
+        );
+    }
+
+    if (typeof cwdSpec.path !== "string" || !cwdSpec.path) {
+        throw new AxError(
+            `cli capability '${capabilityId}' executionTarget.cwd.path must be a string`,
+            2
+        );
+    }
+
+    return resolveCwdPath(
+        cwdSpec.path,
+        cwdSpec.relativeTo ?? "workspace",
+        capabilityId,
+        runtime,
+        processCwd
+    );
+}
+
+function resolveCwdPath(cwdPath, relativeTo, capabilityId, runtime, processCwd) {
+    if (path.isAbsolute(cwdPath)) {
+        return { path: path.resolve(cwdPath), source: "executionTarget.cwd:absolute" };
+    }
+
+    if (relativeTo === "workspace") {
+        const workspaceRoot = runtime?.workspace?.root;
+        if (!workspaceRoot) {
+            throw new AxError(
+                `cli capability '${capabilityId}' requires a bound workspace to resolve executionTarget.cwd relativeTo='workspace'`,
+                2
+            );
+        }
+        return {
+            path: path.resolve(workspaceRoot, cwdPath),
+            source: "executionTarget.cwd:workspace"
+        };
+    }
+
+    if (relativeTo === "process") {
+        return {
+            path: path.resolve(processCwd, cwdPath),
+            source: "executionTarget.cwd:process"
+        };
+    }
+
+    throw new AxError(
+        `cli capability '${capabilityId}' has unsupported executionTarget.cwd.relativeTo '${relativeTo}'`,
+        2
+    );
 }
 
 function resolveTargetPath(target, capabilityId, runtime, env) {

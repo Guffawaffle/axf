@@ -76,6 +76,10 @@ axf scout --check
 axf run toy echo say --message hello
 axf init capability global.acme.status
 ```
+
+`axf doctor` now reports the workspace source it selected and, under
+WSL, warns when `axf`, `lex`, `node`, or `npm` resolve through Windows
+PATH entries under `/mnt/c/...`.
 ## What's wired up
 
 ### Built-in adapters
@@ -91,14 +95,26 @@ axf init capability global.acme.status
 | Capability | Provider | Lifecycle | Notes |
 |---|---|---|---|
 | `global.echo.say` | internal | active | smallest in-process capability example |
-| `global.lex.recall` | cli | active | sample CLI-backed read capability |
+| `global.lex.*` | cli | active | imported Lex family pack: status/introspect/recall/search/policy-check plus write-classified remember/log-frame/note |
 | `global.majel.status` | cli + majel | active | sample provider-adapter status capability |
 | `global.majel.diff` | cli + majel | active | sample provider-adapter diff capability |
 
 ### Toolspaces
 
 - **`toy`** — smallest mount example; re-mounts `echo.say` with a local default
-- **`ops`** — multi-capability mount example for grouped launch surfaces
+- **`ops`** — multi-capability mount example for grouped launch surfaces, including the reusable read-only Lex pack
+
+## Repo onboarding
+
+The recommended repo flow is:
+
+1. Add `axf.workspace.json` at the repo root so workspace binding is explicit.
+2. Reuse the imported `global.lex.*` family or mount the read-only Lex pack into a toolspace.
+3. Add repo-specific capabilities separately under `manifests/capabilities/` or `manifests/families/`.
+4. Keep MCP optional; AXF works as a plain CLI capability router without it.
+5. Mark mutating capabilities with `sideEffects: "write"`. AXF does not yet have a first-class `approvalRequired` field, so approval gates stay a repo policy or review convention for now.
+
+See [`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md) for a concrete pattern including Lex mounts and WSL/Windows notes.
 
 ## How to add a new provider
 
@@ -164,6 +180,8 @@ test/                           # node:test, zero-dep
     adapter
 13. [`docs/12-layered-docs.md`](docs/12-layered-docs.md) — caller /
     integrator / author paths through the docs
+14. [`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md) —
+  workspace markers, standard Lex capabilities, and platform guidance
 
 ## Tests
 
