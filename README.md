@@ -9,61 +9,136 @@ toolspaces.
 > execute, scaffold, and promote capabilities through one contract.
 > Manifest version `axf/v0` is the current alpha contract.
 
-## Install (alpha)
+## Install and MCP
 
-The framework lives at `/srv/axf/` (the GitHub repo is
-[`Guffawaffle/ax-framework`](https://github.com/Guffawaffle/ax-framework)).
+### License
 
-### Linux / macOS
+AXF is source-available under the custom personal-use license in
+[`LICENSE`](LICENSE). It is not open source.
 
-Expose the CLI on PATH with:
+Permitted use is limited to personal, non-commercial evaluation,
+development, and local execution.
+
+Redistribution, resale, sublicensing, commercial use, business use,
+production use, internal organizational use, employer/client use, SaaS
+use, managed-service use, and embedding in another product, service,
+SDK, platform, agent, workflow system, or commercial tooling require a
+separate written license.
+
+The npm package name is `@smartergpt/axf`. It installs two bins:
+
+- `axf` — the CLI entrypoint
+- `axf-mcp` — the stdio MCP server entrypoint
+
+MCP clients should launch `axf-mcp`. The server exposes exactly one MCP
+tool named `axf`, and that tool routes into AXF's existing capability
+surface for the bound workspace.
+
+### Global install
 
 ```sh
-sudo ln -sfn /srv/axf/bin/axf.js /usr/local/bin/axf
+npm install --global @smartergpt/axf
 ```
 
-### Windows
+Then use either bin directly:
 
-Three supported entry shapes — pick the one that matches how the
-workspace runs axf.
-
-**1. npm-installed shim (recommended).** From a clone of the framework:
-
-```powershell
-npm install --global .
+```sh
+axf doctor
+axf-mcp
 ```
 
-npm writes `axf.cmd` and `axf.ps1` shims into the global npm bin
-directory (`%AppData%\npm` on Windows, already on PATH for most
-installs). Both shims dispatch to `bin/axf.js` via the bundled Node
-runtime, so PowerShell, cmd, and Git Bash all resolve `axf` to the
-same binary.
+### Repo-local dev launch
 
-**2. PowerShell function** (no global install):
+From a local clone, run the bins directly with Node:
 
-```powershell
-function axf { node 'C:\src\ax-framework\bin\axf.js' @args }
+```sh
+node /path/to/ax-framework/bin/axf.js doctor
+node /path/to/ax-framework/bin/axf-mcp.js
 ```
 
-Add to `$PROFILE` to persist.
+A repo-local MCP configuration looks like this:
 
-**3. cmd shim** (`axf.cmd` somewhere on PATH):
-
-```cmd
-@echo off
-node "C:\src\ax-framework\bin\axf.js" %*
+```json
+{
+  "mcpServers": {
+    "axf": {
+      "command": "node",
+      "args": ["/path/to/ax-framework/bin/axf-mcp.js"],
+      "cwd": "/path/to/workspace",
+      "env": {
+        "AXF_WORKSPACE": "/path/to/workspace"
+      }
+    }
+  }
+}
 ```
 
-### Workspace discovery
+### npm / npx launch
 
-`axf` finds its workspace by walking up from the current directory for
-an `axf.workspace.json` marker, then by walking up from the binary's own
-location. Override on any platform:
+The published-package launch shape was validated locally with the packed
+tarball using these equivalent forms:
 
-- POSIX: `AXF_WORKSPACE=/path/to/workspace axf doctor`
-- PowerShell: `$env:AXF_WORKSPACE = 'C:\src\my-ws'; axf doctor`
-- cmd: `set AXF_WORKSPACE=C:\src\my-ws & axf doctor`
-- Any shell: `axf --workspace C:\src\my-ws doctor`
+```sh
+npx -y --package @smartergpt/axf axf doctor
+npx -y --package @smartergpt/axf axf-mcp
+
+npm exec --yes --package @smartergpt/axf -- axf doctor
+npm exec --yes --package @smartergpt/axf -- axf-mcp
+```
+
+### Windows-native launch
+
+For npm-installed Windows shims, use the `.cmd` entrypoints in MCP
+configs:
+
+```json
+{
+  "mcpServers": {
+    "axf": {
+      "command": "axf-mcp.cmd",
+      "args": [],
+      "cwd": "C:\\src\\my-workspace",
+      "env": {
+        "AXF_WORKSPACE": "C:\\src\\my-workspace"
+      }
+    }
+  }
+}
+```
+
+### WSL / Linux launch
+
+Use the native binary and bind the target workspace explicitly:
+
+```json
+{
+  "mcpServers": {
+    "axf": {
+      "command": "axf-mcp",
+      "args": [],
+      "cwd": "/home/user/src/my-workspace",
+      "env": {
+        "AXF_WORKSPACE": "/home/user/src/my-workspace"
+      }
+    }
+  }
+}
+```
+
+### Workspace binding
+
+`axf` and `axf-mcp` find the active workspace in this order:
+
+1. explicit `--workspace`
+2. `AXF_WORKSPACE`
+3. nearest `axf.workspace.json` from `cwd`
+4. nearest `axf.workspace.json` from the installed script location
+5. `cwd` fallback
+
+For MCP clients, set both `cwd` and `AXF_WORKSPACE` to the intended
+workspace when possible. That makes the exposed command surface
+deterministic and keeps workspace-relative execution targets anchored to
+the right repo.
 
 From any directory once installed:
 
@@ -77,9 +152,26 @@ axf run toy echo say --message hello
 axf init capability global.acme.status
 ```
 
-`axf doctor` now reports the workspace source it selected and, under
-WSL, warns when `axf`, `lex`, `node`, or `npm` resolve through Windows
-PATH entries under `/mnt/c/...`.
+`axf doctor` reports the workspace source it selected and, under WSL,
+warns when `axf`, `lex`, `node`, or `npm` resolve through Windows PATH
+entries under `/mnt/c/...`.
+
+### MCP routing and governance
+
+The MCP server exposes one tool named `axf`. Supported operations are:
+
+- `list`
+- `inspect`
+- `doctor`
+- `scout_check`
+- `run`
+
+Those operations route into AXF's manifest-backed discovery, resolver,
+lifecycle, policy, adapter, and executor paths. MCP does not add a
+second governance model or a raw shell bypass around AXF.
+
+Lex appears through AXF only when the bound AXF workspace discovers or
+mounts Lex capabilities such as `global.lex.*` or `toolspace.ops.lex.*`.
 ## What's wired up
 
 ### Built-in adapters

@@ -1,13 +1,23 @@
 {
-  "name": "ax-framework",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@smartergpt/axf",
+  "version": "0.1.0",
+  "private": false,
   "type": "module",
-  "description": "Manifest-driven axf launcher and toolspace framework prototype.",
+  "description": "Manifest-driven AXF capability router with CLI and MCP entrypoints.",
   "bin": {
     "axf": "./bin/axf.js",
     "axf-mcp": "./bin/axf-mcp.js"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "adapters/",
+    "manifests/",
+    "schemas/",
+    "axf.workspace.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "axf": "node bin/axf.js",
     "axf-mcp": "node bin/axf-mcp.js",
@@ -15,5 +25,17 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Guffawaffle/ax-framework.git"
+  },
+  "homepage": "https://smartergpt.dev/axf",
+  "bugs": {
+    "url": "https://github.com/Guffawaffle/ax-framework/issues"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "publishConfig": {
+    "access": "public"
   }
 }
