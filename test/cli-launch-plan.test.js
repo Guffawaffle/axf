@@ -168,13 +168,7 @@ test("cli executionTarget cwd overrides the workspace default", async () => {
     });
 
     const out = await captureStdout(() =>
-      main([
-        "--workspace",
-        root,
-        "run",
-        "global.demo.cwd-override",
-        "--json",
-      ], {
+      main(["--workspace", root, "run", "global.demo.cwd-override", "--json"], {
         cwd: caller,
         env: process.env,
       }),
@@ -184,7 +178,10 @@ test("cli executionTarget cwd overrides the workspace default", async () => {
     assert.equal(result.ok, true);
     assert.equal(result.data.cwd, workDir);
     assert.equal(result.meta.launchPlan.cwd, workDir);
-    assert.equal(result.meta.launchPlan.cwdSource, "executionTarget.cwd:workspace");
+    assert.equal(
+      result.meta.launchPlan.cwdSource,
+      "executionTarget.cwd:workspace",
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(caller, { recursive: true, force: true });
