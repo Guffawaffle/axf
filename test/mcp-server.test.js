@@ -45,25 +45,108 @@ test("tools/call routes run through the single axf tool", async () => {
 });
 
 test("stdio MCP entrypoint serves the single axf tool", async () => {
-  const response = await requestToolsList([
-    path.join(repoRoot, "bin", "axf-mcp.js"),
-  ]);
+  const { responses, stdout } = await requestStdioServer(
+    [path.join(repoRoot, "bin", "axf-mcp.js")],
+    [
+      initializeRequest(1),
+      { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+    ],
+  );
+  const initializeResponse = findResponse(responses, 1);
+  const toolsListResponse = findResponse(responses, 2);
 
-  assert.equal(response.result.tools.length, 1);
-  assert.equal(response.result.tools[0].name, "axf");
+  assert.equal(initializeResponse.result.serverInfo.name, "axf-mcp");
+  assert.equal(toolsListResponse.result.tools.length, 1);
+  assert.equal(toolsListResponse.result.tools[0].name, "axf");
+  assertStdoutJsonLinesOnly(stdout);
 });
 
 test("axf mcp serves the same single axf tool", async () => {
-  const response = await requestToolsList([
-    path.join(repoRoot, "bin", "axf.js"),
-    "mcp",
-  ]);
+  const { responses, stdout } = await requestStdioServer(
+    [path.join(repoRoot, "bin", "axf.js"), "mcp"],
+    [
+      initializeRequest(1),
+      { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+    ],
+  );
+  const response = findResponse(responses, 2);
 
   assert.equal(response.result.tools.length, 1);
   assert.equal(response.result.tools[0].name, "axf");
+  assertStdoutJsonLinesOnly(stdout);
 });
 
-async function requestToolsList(args) {
+test("stdio MCP entrypoint routes tools/call over newline-delimited stdio", async () => {
+  const { responses, stdout } = await requestStdioServer(
+    [path.join(repoRoot, "bin", "axf-mcp.js")],
+    [
+      initializeRequest(1),
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "axf",
+          arguments: {
+            operation: "run",
+            workspace: repoRoot,
+            target: { id: "global.echo.say" },
+            args: { message: "newline stdio" },
+          },
+        },
+      },
+    ],
+  );
+  const response = findResponse(responses, 2);
+
+  assert.equal(response.result.isError, false);
+  assert.equal(response.result.structuredContent.ok, true);
+  assert.equal(response.result.structuredContent.operation, "run");
+  assert.equal(response.result.structuredContent.data, "newline stdio");
+  assertStdoutJsonLinesOnly(stdout);
+});
+
+test("stdio MCP entrypoint accepts VS Code-shaped raw JSON initialize", async () => {
+  const { responses, stdout } = await requestStdioServer(
+    [path.join(repoRoot, "bin", "axf-mcp.js")],
+    [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "Visual Studio Code", version: "1.0.0" },
+        },
+      },
+    ],
+  );
+  const response = findResponse(responses, 1);
+
+  assert.equal(response.result.serverInfo.name, "axf-mcp");
+  assert.equal(response.result.capabilities.tools.listChanged, false);
+  assertStdoutJsonLinesOnly(stdout);
+});
+
+test("stdio MCP entrypoint accepts Content-Length input as legacy compatibility", async () => {
+  const { responses, stdout } = await requestStdioServer(
+    [path.join(repoRoot, "bin", "axf-mcp.js")],
+    [
+      initializeRequest(1),
+      { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+    ],
+    { encodeMessage: encodeContentLengthMessage },
+  );
+  const response = findResponse(responses, 2);
+
+  assert.equal(response.result.tools.length, 1);
+  assert.equal(response.result.tools[0].name, "axf");
+  assertStdoutJsonLinesOnly(stdout);
+});
+
+async function requestStdioServer(args, requests, options = {}) {
+  const encode = options.encodeMessage ?? encodeLineMessage;
   const proc = spawn(process.execPath, args, {
     cwd: repoRoot,
     env: { ...process.env, AXF_WORKSPACE: repoRoot },
@@ -71,62 +154,88 @@ async function requestToolsList(args) {
   });
 
   let stderr = "";
+  let stdout = "";
+  const responses = [];
+  const expectedIds = new Set(
+    requests
+      .filter((request) => request.id !== undefined && request.id !== null)
+      .map((request) => request.id),
+  );
   proc.stderr.setEncoding("utf8");
   proc.stderr.on("data", (chunk) => {
     stderr += chunk;
   });
 
+  const closePromise = once(proc, "close");
   const responsePromise = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error(`timed out waiting for tools/list response${stderr ? `: ${stderr}` : ""}`));
+      reject(
+        new Error(
+          `timed out waiting for MCP response${stderr ? `: ${stderr}` : ""}`,
+        ),
+      );
     }, 5000);
 
-    const onData = createFrameParser((message) => {
-      if (message.id === 2) {
+    const onData = createLineParser((message) => {
+      responses.push(message);
+      expectedIds.delete(message.id);
+      if (expectedIds.size === 0) {
         clearTimeout(timeout);
-        resolve(message);
+        resolve({ responses, stdout });
       }
     });
 
-    proc.stdout.on("data", onData);
+    proc.stdout.on("data", (chunk) => {
+      stdout += chunk.toString("utf8");
+      try {
+        onData(chunk);
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
     proc.on("exit", (code) => {
       clearTimeout(timeout);
       if (code !== 0) {
-        reject(new Error(`axf-mcp exited with code ${code}${stderr ? `: ${stderr}` : ""}`));
+        reject(
+          new Error(
+            `axf-mcp exited with code ${code}${stderr ? `: ${stderr}` : ""}`,
+          ),
+        );
       }
     });
   });
 
-  proc.stdin.write(
-    encodeMessage({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test", version: "1.0.0" },
-      },
-    }),
-  );
-  proc.stdin.write(
-    encodeMessage({
-      jsonrpc: "2.0",
-      id: 2,
-      method: "tools/list",
-      params: {},
-    }),
-  );
+  for (const request of requests) {
+    proc.stdin.write(encode(request));
+  }
 
-  const response = await responsePromise;
+  const result = await responsePromise;
 
   proc.kill("SIGTERM");
-  await once(proc, "close");
+  await closePromise;
 
-  return response;
+  return result;
 }
 
-function encodeMessage(value) {
+function initializeRequest(id) {
+  return {
+    jsonrpc: "2.0",
+    id,
+    method: "initialize",
+    params: {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "test", version: "1.0.0" },
+    },
+  };
+}
+
+function encodeLineMessage(value) {
+  return `${JSON.stringify(value)}\n`;
+}
+
+function encodeContentLengthMessage(value) {
   const body = Buffer.from(JSON.stringify(value), "utf8");
   return Buffer.concat([
     Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, "utf8"),
@@ -134,34 +243,40 @@ function encodeMessage(value) {
   ]);
 }
 
-function createFrameParser(onMessage) {
-  let buffer = Buffer.alloc(0);
+function createLineParser(onMessage) {
+  let buffer = "";
 
   return (chunk) => {
-    buffer = Buffer.concat([buffer, chunk]);
+    buffer += chunk.toString("utf8");
 
     while (true) {
-      const headerEnd = buffer.indexOf("\r\n\r\n");
-      if (headerEnd === -1) {
+      const lineEnd = buffer.indexOf("\n");
+      if (lineEnd === -1) {
         return;
       }
 
-      const header = buffer.subarray(0, headerEnd).toString("utf8");
-      const match = /Content-Length:\s*(\d+)/i.exec(header);
-      if (!match) {
-        throw new Error("missing Content-Length header in MCP response");
+      const line = buffer.slice(0, lineEnd).trim();
+      buffer = buffer.slice(lineEnd + 1);
+      if (line === "") {
+        continue;
       }
-
-      const contentLength = Number(match[1]);
-      const bodyStart = headerEnd + 4;
-      const bodyEnd = bodyStart + contentLength;
-      if (buffer.length < bodyEnd) {
-        return;
-      }
-
-      const body = buffer.subarray(bodyStart, bodyEnd).toString("utf8");
-      buffer = buffer.subarray(bodyEnd);
-      onMessage(JSON.parse(body));
+      onMessage(JSON.parse(line));
     }
   };
+}
+
+function findResponse(responses, id) {
+  const response = responses.find((message) => message.id === id);
+  assert.ok(response, `missing response id ${id}`);
+  return response;
+}
+
+function assertStdoutJsonLinesOnly(stdout) {
+  assert.match(stdout, /^\{/);
+  assert.equal(stdout.includes("Content-Length"), false);
+
+  const lines = stdout.trimEnd().split(/\r?\n/);
+  for (const line of lines) {
+    assert.doesNotThrow(() => JSON.parse(line));
+  }
 }

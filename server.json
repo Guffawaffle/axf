@@ -7,12 +7,12 @@
     "url": "https://github.com/Guffawaffle/ax-framework",
     "source": "github"
   },
-  "version": "0.1.2",
+  "version": "0.1.3",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@smartergpt/axf",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "transport": {
         "type": "stdio"
       },
