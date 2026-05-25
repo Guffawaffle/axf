@@ -81,7 +81,7 @@ async function writeCap(root, cap) {
 function captureStdout(fn) {
   const original = process.stdout.write.bind(process.stdout);
   const chunks = [];
-  process.stdout.write = (chunk, ...rest) => {
+  process.stdout.write = (chunk) => {
     chunks.push(typeof chunk === "string" ? chunk : chunk.toString());
     return true;
   };

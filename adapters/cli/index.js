@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { AxError } from "../../src/core/errors.js";
 import { resolveCliLaunchPlan } from "../../src/core/cli-launch-plan.js";
 import { prepareCommandInvocation } from "../../src/core/command-invocation.js";
 

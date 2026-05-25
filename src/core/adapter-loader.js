@@ -304,9 +304,9 @@ export class AdapterRegistry {
 
   listToolspacePrivate() {
     const out = [];
-    for (const [ts, m] of this.toolspaceTypes)
+    for (const [, m] of this.toolspaceTypes)
       for (const r of m.values()) out.push(r);
-    for (const [ts, m] of this.toolspaceProviders)
+    for (const [, m] of this.toolspaceProviders)
       for (const r of m.values()) out.push(r);
     return out;
   }
