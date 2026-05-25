@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { AXFMCPServer } from "../src/mcp/server.js";
 
@@ -14,13 +16,38 @@ test("tools/list advertises exactly one tool named axf", async () => {
   assert.equal(Array.isArray(response.tools), true);
   assert.equal(response.tools.length, 1);
   assert.equal(response.tools[0].name, "axf");
+  assert.equal(
+    response.tools[0].description,
+    "AXF capability router. Use this single MCP tool to list, inspect, and run AXF capabilities. Capabilities such as global.lex.status are not separate MCP tools. Call with operation=help, list, inspect, run, doctor, or scout_check. Always inspect before run and respect lifecycle/sideEffects/policy metadata.",
+  );
   assert.deepEqual(response.tools[0].inputSchema.properties.operation.enum, [
+    "help",
     "list",
     "inspect",
+    "run",
     "doctor",
     "scout_check",
-    "run",
   ]);
+});
+
+test("tools/call help returns the single-tool router contract", async () => {
+  const server = new AXFMCPServer({ cwd: repoRoot, env: process.env });
+  const response = await server.handleRequest({
+    method: "tools/call",
+    params: {
+      name: "axf",
+      arguments: {
+        operation: "help",
+        workspace: repoRoot,
+      },
+    },
+  });
+
+  assert.equal(response.isError, false);
+  assert.equal(response.structuredContent.ok, true);
+  assert.equal(response.structuredContent.operation, "help");
+  assert.equal(response.structuredContent.tool.name, "axf");
+  assert.equal(response.structuredContent.contract.capabilitiesAreSeparateTools, false);
 });
 
 test("tools/call routes run through the single axf tool", async () => {
@@ -145,6 +172,99 @@ test("stdio MCP entrypoint accepts Content-Length input as legacy compatibility"
   assertStdoutJsonLinesOnly(stdout);
 });
 
+test("persistent MCP server reloads registry state between list calls", async () => {
+  const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "axf-mcp-refresh-"));
+  await writeFile(
+    path.join(workspaceRoot, "axf.workspace.json"),
+    JSON.stringify({ manifestVersion: "axf/v0", name: "fixture" }),
+  );
+  await mkdir(path.join(workspaceRoot, "manifests", "capabilities"), {
+    recursive: true,
+  });
+
+  const session = await startPersistentStdioServer(
+    [path.join(repoRoot, "bin", "axf-mcp.js")],
+    { cwd: workspaceRoot, workspace: workspaceRoot },
+  );
+
+  try {
+    await session.send(initializeRequest(1));
+
+    const firstList = await session.send({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: {
+        name: "axf",
+        arguments: {
+          operation: "list",
+          workspace: workspaceRoot,
+        },
+      },
+    });
+    const firstIds = firstList.result.structuredContent.capabilities.map(
+      (capability) => capability.id,
+    );
+
+    const addedId = "global.dynamic.status";
+    assert.equal(firstIds.includes(addedId), false);
+
+    await writeFile(
+      path.join(
+        workspaceRoot,
+        "manifests",
+        "capabilities",
+        `${addedId}.json`,
+      ),
+      `${JSON.stringify(
+        {
+          manifestVersion: "axf/v0",
+          id: addedId,
+          summary: "Dynamic capability added after MCP server start",
+          provider: "echo",
+          adapterType: "internal",
+          executionTarget: { handler: "echo.say" },
+          argsSchema: {
+            type: "object",
+            properties: {},
+          },
+          outputModes: ["json"],
+          sideEffects: "none",
+          scope: "global",
+          lifecycleState: "active",
+          defaults: {},
+          policies: [],
+          owner: "test:mcp-refresh",
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const secondList = await session.send({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "axf",
+        arguments: {
+          operation: "list",
+          workspace: workspaceRoot,
+        },
+      },
+    });
+    const secondIds = secondList.result.structuredContent.capabilities.map(
+      (capability) => capability.id,
+    );
+
+    assert.equal(secondIds.includes(addedId), true);
+    assert.equal(secondIds.length > firstIds.length, true);
+    assertStdoutJsonLinesOnly(session.getStdout());
+  } finally {
+    await session.stop();
+  }
+});
+
 async function requestStdioServer(args, requests, options = {}) {
   const encode = options.encodeMessage ?? encodeLineMessage;
   const proc = spawn(process.execPath, args, {
@@ -216,6 +336,90 @@ async function requestStdioServer(args, requests, options = {}) {
   await closePromise;
 
   return result;
+}
+
+async function startPersistentStdioServer(args, options = {}) {
+  const proc = spawn(process.execPath, args, {
+    cwd: options.cwd ?? repoRoot,
+    env: {
+      ...process.env,
+      ...(options.env ?? {}),
+      AXF_WORKSPACE: options.workspace ?? repoRoot,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  let stderr = "";
+  let stdout = "";
+  const pending = new Map();
+
+  proc.stderr.setEncoding("utf8");
+  proc.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+
+  const onData = createLineParser((message) => {
+    const waiter = pending.get(message.id);
+    if (!waiter) {
+      return;
+    }
+    clearTimeout(waiter.timeout);
+    pending.delete(message.id);
+    waiter.resolve(message);
+  });
+
+  proc.stdout.on("data", (chunk) => {
+    stdout += chunk.toString("utf8");
+    onData(chunk);
+  });
+
+  proc.on("exit", (code) => {
+    if (code === 0) {
+      return;
+    }
+
+    for (const [id, waiter] of pending.entries()) {
+      clearTimeout(waiter.timeout);
+      waiter.reject(
+        new Error(
+          `axf-mcp exited with code ${code}${stderr ? `: ${stderr}` : ""}`,
+        ),
+      );
+      pending.delete(id);
+    }
+  });
+
+  return {
+    send(request, sendOptions = {}) {
+      const encode = sendOptions.encodeMessage ?? encodeLineMessage;
+      if (request.id === undefined || request.id === null) {
+        proc.stdin.write(encode(request));
+        return Promise.resolve(null);
+      }
+
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          pending.delete(request.id);
+          reject(
+            new Error(
+              `timed out waiting for MCP response${stderr ? `: ${stderr}` : ""}`,
+            ),
+          );
+        }, sendOptions.timeout ?? 5000);
+
+        pending.set(request.id, { resolve, reject, timeout });
+        proc.stdin.write(encode(request));
+      });
+    },
+    getStdout() {
+      return stdout;
+    },
+    async stop() {
+      const closePromise = once(proc, "close");
+      proc.kill("SIGTERM");
+      await closePromise;
+    },
+  };
 }
 
 function initializeRequest(id) {

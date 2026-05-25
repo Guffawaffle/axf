@@ -234,11 +234,7 @@ function spawnCapture(command, args, { cwd, env }) {
   });
 }
 
-function buildFamilyManifest({
-  importSource,
-  inventory,
-  existingFamily,
-}) {
+function buildFamilyManifest({ importSource, inventory, existingFamily }) {
   const familyName = importSource.family;
   const executionTarget = importSource.executionTarget ??
     existingFamily?.executionTarget ?? {

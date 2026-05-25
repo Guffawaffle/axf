@@ -1,23 +1,27 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  AXF_MCP_OPERATIONS,
+  AXF_TOOL_DESCRIPTION,
+  AXF_TOOL_NAME,
+} from "./contract.js";
 import { performOperation } from "./operations.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const AXF_TOOL_NAME = "axf";
+export { AXF_TOOL_NAME } from "./contract.js";
 
 export const AXF_TOOL = {
   name: AXF_TOOL_NAME,
-  description:
-    "Stable AXF capability router. Use it to list, inspect, diagnose, scout, and run AXF capabilities through AXF's own control plane.",
+  description: AXF_TOOL_DESCRIPTION,
   inputSchema: {
     type: "object",
     required: ["operation"],
     properties: {
       operation: {
         type: "string",
-        enum: ["list", "inspect", "doctor", "scout_check", "run"],
+        enum: AXF_MCP_OPERATIONS,
       },
       workspace: {
         type: "string",

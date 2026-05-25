@@ -12,14 +12,23 @@ import {
 } from "../core/runtime-diagnostics.js";
 import { scoutWorkspace } from "../core/scout.js";
 import { findWorkspaceRoot } from "../core/workspace.js";
+import {
+  AXF_MCP_CAPABILITY_EXAMPLES,
+  AXF_MCP_EXAMPLES,
+  AXF_MCP_NOT_EXPOSED_COMMANDS,
+  AXF_MCP_OPERATIONS,
+  AXF_TOOL_DESCRIPTION,
+  AXF_TOOL_NAME,
+} from "./contract.js";
 
-const OPERATIONS = new Set(["list", "inspect", "doctor", "scout_check", "run"]);
+const OPERATIONS = new Set(AXF_MCP_OPERATIONS);
 
 export class MCPInputError extends Error {
-  constructor(message) {
+  constructor(message, details = null) {
     super(message);
     this.name = "MCPInputError";
     this.code = "INVALID_PARAMS";
+    this.details = details;
   }
 }
 
@@ -34,19 +43,22 @@ export async function performOperation(rawInput, options = {}) {
     workspaceSummary = context.workspaceSummary;
 
     switch (input.operation) {
+      case "help":
+        return performHelp(context);
       case "list":
         return performList(context);
       case "inspect":
         return await performInspect(context);
+      case "run":
+        return await performRun(context);
       case "doctor":
         return await performDoctor(context);
       case "scout_check":
         return await performScoutCheck(context);
-      case "run":
-        return await performRun(context);
       default:
         throw new MCPInputError(
-          `operation must be one of ${[...OPERATIONS].join(", ")}`,
+          buildOperationErrorMessage(),
+          buildOperationSelectionErrorDetails(),
         );
     }
   } catch (error) {
@@ -59,6 +71,95 @@ export async function performOperation(rawInput, options = {}) {
       workspaceSummary,
     );
   }
+}
+
+function performHelp(context) {
+  return attachWorkspace(
+    {
+      ok: true,
+      operation: "help",
+      tool: {
+        name: AXF_TOOL_NAME,
+        description: AXF_TOOL_DESCRIPTION,
+        contract: "single-tool-capability-router",
+      },
+      contract: {
+        summary:
+          "AXF MCP exposes one tool named axf as an agent-safe router over the current AXF registry.",
+        capabilitiesAreSeparateTools: false,
+        routingNote:
+          "Capabilities such as global.lex.status and global.stfc-mod.status are discovered through the single axf MCP tool, not exposed as separate MCP tools.",
+        capabilityExamples: AXF_MCP_CAPABILITY_EXAMPLES,
+        discoveryFlow: ["list", "inspect", "run"],
+        runRules: [
+          "Use operation=list to discover capabilities.",
+          "Use operation=inspect before operation=run.",
+          "Use operation=run only with args matching inspect output.",
+          "Respect lifecycle, sideEffects, policies, and workspace binding.",
+        ],
+        registryLifecycle: {
+          cliControlPlane:
+            "Registry and manifest changes still happen through normal AXF CLI and filesystem/control-plane flows.",
+          mcpReloadBehavior:
+            "MCP reloads registry state per request, so external AXF updates become visible without restarting the MCP server.",
+          mutationToolsExposed: false,
+        },
+        boundary: {
+          cliRemainsAuthoritative: true,
+          notExposedViaMcp: AXF_MCP_NOT_EXPOSED_COMMANDS,
+          futureParity:
+            "Full CLI parity may be considered later behind explicit policy and approval gates.",
+        },
+        scoutCheck: {
+          semantics:
+            "scout_check is read-only structured scout diagnostics, not a literal axf scout --check wrapper.",
+        },
+      },
+      operations: [
+        {
+          name: "help",
+          purpose: "Explain the single-tool AXF MCP contract and safe routing flow.",
+          requiresTarget: false,
+          readOnly: true,
+        },
+        {
+          name: "list",
+          purpose: "Discover capabilities in the current AXF registry.",
+          requiresTarget: false,
+          readOnly: true,
+        },
+        {
+          name: "inspect",
+          purpose:
+            "Inspect capability metadata, lifecycle, side effects, policies, and launch details before execution.",
+          requiresTarget: true,
+          readOnly: true,
+        },
+        {
+          name: "run",
+          purpose:
+            "Run a capability through AXF's normal resolver, policy, adapter, and executor path.",
+          requiresTarget: true,
+          readOnly: false,
+        },
+        {
+          name: "doctor",
+          purpose: "Return read-only AXF registry and runtime diagnostics.",
+          requiresTarget: false,
+          readOnly: true,
+        },
+        {
+          name: "scout_check",
+          purpose:
+            "Return read-only structured scout diagnostics for workspace and registry state.",
+          requiresTarget: false,
+          readOnly: true,
+        },
+      ],
+      examples: AXF_MCP_EXAMPLES,
+    },
+    context.workspaceSummary,
+  );
 }
 
 function performList(context) {
@@ -281,17 +382,35 @@ function buildInspectableLaunchPlan(capability, runtime, env) {
 
 function validateInput(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new MCPInputError("tool arguments must be an object");
+    throw new MCPInputError(
+      "tool arguments must be an object",
+      buildOperationSelectionErrorDetails(),
+    );
   }
 
-  if (typeof value.operation !== "string" || !OPERATIONS.has(value.operation)) {
+  if (value.operation === undefined) {
     throw new MCPInputError(
-      `operation must be one of ${[...OPERATIONS].join(", ")}`,
+      `${buildOperationErrorMessage()} Operation is required.`,
+      buildOperationSelectionErrorDetails(),
+    );
+  }
+
+  if (typeof value.operation !== "string" || value.operation.length === 0) {
+    throw new MCPInputError(
+      `${buildOperationErrorMessage()} Operation must be a non-empty string.`,
+      buildOperationSelectionErrorDetails(),
+    );
+  }
+
+  if (!OPERATIONS.has(value.operation)) {
+    throw new MCPInputError(
+      `Unknown operation '${value.operation}'. ${buildOperationErrorMessage()}`,
+      buildOperationSelectionErrorDetails(),
     );
   }
 
   const workspace = optionalString(value.workspace, "workspace");
-  const target = validateTarget(value.target);
+  const target = validateTarget(value.target, value.operation);
   const args = validateArgs(value.args);
   const includeDrafts = optionalBoolean(value.includeDrafts, "includeDrafts");
   const allowAnyLifecycle = optionalBoolean(
@@ -309,7 +428,7 @@ function validateInput(value) {
   };
 }
 
-function validateTarget(value) {
+function validateTarget(value, operation) {
   if (value === undefined) {
     return null;
   }
@@ -325,6 +444,10 @@ function validateTarget(value) {
 
   if (id) {
     return { id };
+  }
+
+  if (value.path === undefined) {
+    throw missingTargetError(operation);
   }
 
   if (!Array.isArray(value.path) || value.path.length === 0) {
@@ -345,7 +468,7 @@ function validateTarget(value) {
 
 function resolveTargetTokens(target, operation) {
   if (!target) {
-    throw new MCPInputError(`${operation} requires target.id or target.path`);
+    throw missingTargetError(operation);
   }
   if (target.id) {
     return [target.id];
@@ -406,12 +529,22 @@ function summarizeCapability(capability) {
 function formatOperationError(error, operation) {
   const code = classifyError(error);
   let message = error?.message ?? String(error);
+  let details = error?.details ?? null;
 
   if (operation === "run" && code === "UNKNOWN_CAPABILITY") {
     message = `${message}. Use operation 'list' to discover capabilities or 'inspect' to inspect a target before running it.`;
+    details = {
+      ...details,
+      inspectExample: createInspectExample(),
+      nextSteps: buildRunDiscoveryNextSteps(),
+    };
   }
 
-  return { code, message };
+  return {
+    code,
+    message,
+    ...(details ?? {}),
+  };
 }
 
 function classifyError(error) {
@@ -431,4 +564,81 @@ function classifyError(error) {
     return "AXF_ERROR";
   }
   return error?.code ?? "INTERNAL_ERROR";
+}
+
+function buildOperationErrorMessage() {
+  return `operation must be one of ${AXF_MCP_OPERATIONS.join(", ")}.`;
+}
+
+function buildOperationSelectionErrorDetails() {
+  return {
+    availableOperations: AXF_MCP_OPERATIONS,
+    nextSteps: [
+      createNextStep(
+        "call_help",
+        "Call operation=help to learn the single-tool AXF MCP contract.",
+        { operation: "help" },
+      ),
+      createNextStep(
+        "call_list",
+        "Call operation=list to discover capability ids in the bound AXF registry.",
+        { operation: "list" },
+      ),
+      createNextStep(
+        "inspect_before_run",
+        "Call operation=inspect with a capability id before operation=run.",
+        createInspectExample(),
+      ),
+    ],
+  };
+}
+
+function missingTargetError(operation) {
+  const isRun = operation === "run";
+  const details = isRun
+    ? {
+        nextStep: createNextStep(
+          "inspect_before_run",
+          "Inspect the capability you plan to run before calling operation=run.",
+          createInspectExample(),
+        ),
+        inspectExample: createInspectExample(),
+        nextSteps: buildRunDiscoveryNextSteps(),
+      }
+    : null;
+
+  return new MCPInputError(
+    `${operation} requires target.id or target.path. Prefer target.id from operation=list when possible.`,
+    details,
+  );
+}
+
+function buildRunDiscoveryNextSteps() {
+  return [
+    createNextStep(
+      "call_list",
+      "Call operation=list to discover capability ids.",
+      { operation: "list" },
+    ),
+    createNextStep(
+      "inspect_before_run",
+      "Inspect the capability you want to run before invoking operation=run.",
+      createInspectExample(),
+    ),
+  ];
+}
+
+function createInspectExample(id = "global.lex.status") {
+  return {
+    operation: "inspect",
+    target: { id },
+  };
+}
+
+function createNextStep(action, description, argumentsValue) {
+  return {
+    action,
+    description,
+    arguments: argumentsValue,
+  };
 }

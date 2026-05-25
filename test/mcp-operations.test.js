@@ -4,6 +4,23 @@ import { performOperation } from "../src/mcp/operations.js";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 
+test("axf help explains the single-tool router contract", async () => {
+  const result = await performOperation({
+    operation: "help",
+    workspace: repoRoot,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.operation, "help");
+  assert.equal(result.tool.name, "axf");
+  assert.equal(result.contract.capabilitiesAreSeparateTools, false);
+  assert.equal(result.contract.capabilityExamples.includes("global.lex.status"), true);
+  assert.equal(result.contract.capabilityExamples.includes("global.stfc-mod.status"), true);
+  assert.match(result.contract.registryLifecycle.mcpReloadBehavior, /per request/);
+  assert.equal(result.examples.some((example) => example.title === "inspect global.lex.status"), true);
+  assert.equal(result.examples.some((example) => example.title === "run global.lex.status"), true);
+});
+
 test("axf list returns discovered capabilities", async () => {
   const result = await performOperation({
     operation: "list",
@@ -43,6 +60,44 @@ test("axf run succeeds for a harmless known AXF capability", async () => {
   assert.equal(result.data, "hello via mcp");
 });
 
+test("axf reports actionable guidance when operation is missing", async () => {
+  const result = await performOperation({
+    workspace: repoRoot,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.operation, "unknown");
+  assert.equal(result.error.code, "INVALID_PARAMS");
+  assert.deepEqual(result.error.availableOperations, [
+    "help",
+    "list",
+    "inspect",
+    "run",
+    "doctor",
+    "scout_check",
+  ]);
+  assert.deepEqual(
+    result.error.nextSteps.map((step) => step.arguments.operation),
+    ["help", "list", "inspect"],
+  );
+});
+
+test("axf reports actionable guidance when operation is invalid", async () => {
+  const result = await performOperation({
+    operation: "deploy",
+    workspace: repoRoot,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.operation, "deploy");
+  assert.equal(result.error.code, "INVALID_PARAMS");
+  assert.match(result.error.message, /Unknown operation 'deploy'/);
+  assert.deepEqual(
+    result.error.nextSteps.map((step) => step.arguments.operation),
+    ["help", "list", "inspect"],
+  );
+});
+
 test("axf run rejects unknown capability", async () => {
   const result = await performOperation({
     operation: "run",
@@ -55,6 +110,23 @@ test("axf run rejects unknown capability", async () => {
   assert.equal(result.error.code, "UNKNOWN_CAPABILITY");
   assert.match(result.error.message, /list/);
   assert.match(result.error.message, /inspect/);
+});
+
+test("axf run missing target returns inspect guidance", async () => {
+  const result = await performOperation({
+    operation: "run",
+    workspace: repoRoot,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.operation, "run");
+  assert.equal(result.error.code, "INVALID_PARAMS");
+  assert.match(result.error.message, /run requires target.id or target.path/);
+  assert.equal(result.error.nextStep.arguments.operation, "inspect");
+  assert.deepEqual(result.error.inspectExample, {
+    operation: "inspect",
+    target: { id: "global.lex.status" },
+  });
 });
 
 test("axf run returns structured errors for invalid args", async () => {
