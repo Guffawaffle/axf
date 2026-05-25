@@ -125,32 +125,37 @@ export function startStdioServer(options = {}) {
 
   process.stdin.on("data", (chunk) => {
     buffer = Buffer.concat([buffer, chunk]);
-    draining = draining.then(async () => {
-      while (true) {
-        const request = readMessage();
-        if (!request) {
-          return;
-        }
-        if (request.id === undefined || request.id === null) {
-          continue;
-        }
+    draining = draining
+      .then(async () => {
+        while (true) {
+          const request = readMessage();
+          if (!request) {
+            return;
+          }
+          if (request.id === undefined || request.id === null) {
+            continue;
+          }
 
-        const response = await server.handleRequest(request);
-        writeMessage(
-          response?.error
-            ? {
-                jsonrpc: "2.0",
-                id: request.id,
-                error: response.error,
-              }
-            : {
-                jsonrpc: "2.0",
-                id: request.id,
-                result: response,
-              },
-        );
-      }
-    });
+          const response = await server.handleRequest(request);
+          writeMessage(
+            response?.error
+              ? {
+                  jsonrpc: "2.0",
+                  id: request.id,
+                  error: response.error,
+                }
+              : {
+                  jsonrpc: "2.0",
+                  id: request.id,
+                  result: response,
+                },
+          );
+        }
+      })
+      .catch((error) => {
+        const message = error?.message ?? String(error);
+        process.stderr.write(`axf-mcp: ${message}\n`);
+      });
   });
 
   process.on("SIGINT", () => process.exit(0));
@@ -159,29 +164,82 @@ export function startStdioServer(options = {}) {
   return server;
 
   function readMessage() {
-    const headerEnd = buffer.indexOf("\r\n\r\n");
-    if (headerEnd === -1) {
-      return null;
+    while (buffer.length > 0) {
+      const framedMessage = readContentLengthMessage();
+      if (framedMessage.status === "message") {
+        return framedMessage.message;
+      }
+      if (framedMessage.status === "incomplete") {
+        return null;
+      }
+
+      const line = readLineMessage();
+      if (!line) {
+        return null;
+      }
+      if (line.text === "") {
+        continue;
+      }
+      return JSON.parse(line.text);
     }
 
-    const header = buffer.subarray(0, headerEnd).toString("utf8");
+    return null;
+  }
+
+  function readContentLengthMessage() {
+    const prefix = buffer.subarray(0, Math.min(buffer.length, 32)).toString("utf8");
+    if (!/^Content-Length:/i.test(prefix)) {
+      return { status: "not-frame" };
+    }
+
+    const delimiter = findHeaderDelimiter(buffer);
+    if (!delimiter) {
+      return { status: "incomplete" };
+    }
+
+    const header = buffer.subarray(0, delimiter.index).toString("utf8");
     const match = /Content-Length:\s*(\d+)/i.exec(header);
     if (!match) {
-      buffer = buffer.subarray(headerEnd + 4);
-      return null;
+      buffer = buffer.subarray(delimiter.index + delimiter.length);
+      return { status: "not-frame" };
     }
 
     const contentLength = Number(match[1]);
-    const bodyStart = headerEnd + 4;
+    const bodyStart = delimiter.index + delimiter.length;
     const bodyEnd = bodyStart + contentLength;
     if (buffer.length < bodyEnd) {
-      return null;
+      return { status: "incomplete" };
     }
 
     const body = buffer.subarray(bodyStart, bodyEnd).toString("utf8");
     buffer = buffer.subarray(bodyEnd);
-    return JSON.parse(body);
+    return { status: "message", message: JSON.parse(body) };
   }
+
+  function readLineMessage() {
+    const lfIndex = buffer.indexOf(0x0a);
+    if (lfIndex === -1) {
+      return null;
+    }
+
+    const lineEnd = lfIndex > 0 && buffer[lfIndex - 1] === 0x0d ? lfIndex - 1 : lfIndex;
+    const text = buffer.subarray(0, lineEnd).toString("utf8").trim();
+    buffer = buffer.subarray(lfIndex + 1);
+    return { text };
+  }
+}
+
+function findHeaderDelimiter(sourceBuffer) {
+  const crlfEnd = sourceBuffer.indexOf("\r\n\r\n");
+  const lfEnd = sourceBuffer.indexOf("\n\n");
+
+  if (crlfEnd === -1 && lfEnd === -1) {
+    return null;
+  }
+  if (crlfEnd !== -1 && (lfEnd === -1 || crlfEnd < lfEnd)) {
+    return { index: crlfEnd, length: 4 };
+  }
+  return { index: lfEnd, length: 2 };
 }
 
 function toolResult(payload) {
@@ -198,9 +256,7 @@ function toolResult(payload) {
 }
 
 function writeMessage(value) {
-  const body = Buffer.from(JSON.stringify(value), "utf8");
-  const header = Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, "utf8");
-  process.stdout.write(Buffer.concat([header, body]));
+  process.stdout.write(`${JSON.stringify(value)}\n`);
 }
 
 function getPackageVersion() {
