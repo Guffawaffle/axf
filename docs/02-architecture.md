@@ -25,6 +25,36 @@ axf CLI
   -> normalized result
 ```
 
+## CLI and MCP surfaces
+
+The CLI remains AXF's full control plane.
+
+That includes lifecycle and registry mutation commands such as
+`init`, `promote`, `demote`, and `scout --write`.
+
+The MCP server is a separate, agent-safe router over the current AXF
+registry. It is intentionally a safe subset, not full CLI parity.
+
+Current MCP scope:
+
+- `help`
+- `list`
+- `inspect`
+- `run`
+- `doctor`
+- `scout_check`
+
+Capabilities such as `global.lex.status` and `global.stfc-mod.status`
+remain registry entries discovered through the single MCP tool `axf`.
+They are not separate MCP tools.
+
+Registry/manifests still change through normal AXF CLI or filesystem
+flows. MCP reloads registry state per request so external AXF updates
+become visible without a dedicated MCP refresh command.
+
+Full CLI parity can be considered later, but only behind explicit
+policy and approval gates.
+
 ## Command grammar
 
 Conceptual grammar:

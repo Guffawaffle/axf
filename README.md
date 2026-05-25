@@ -227,15 +227,40 @@ entries under `/mnt/c/...`.
 
 The MCP server exposes one tool named `axf`. Supported operations are:
 
+- `help`
 - `list`
 - `inspect`
+- `run`
 - `doctor`
 - `scout_check`
-- `run`
 
 Those operations route into AXF's manifest-backed discovery, resolver,
 lifecycle, policy, adapter, and executor paths. MCP does not add a
 second governance model or a raw shell bypass around AXF.
+
+AXF MCP is intentionally not full CLI parity yet. The CLI remains the
+authoritative mutation and control plane for commands such as `init`,
+`promote`, `demote`, `scout --write`, and other registry/materialization
+flows.
+
+Capabilities such as `global.lex.status` and `global.stfc-mod.status`
+are not separate MCP tools. Use `operation=help` to learn the router
+contract, `operation=list` to discover capabilities, and
+`operation=inspect` before `operation=run`. Treat capability
+`lifecycleState`, `sideEffects`, `policies`, and workspace binding as
+part of the execution contract.
+
+`scout_check` is AXF's MCP-specific read-only structured scout
+diagnostics surface. It is not intended to promise literal CLI parity
+with `axf scout --check`.
+
+Registry and manifest updates still happen through normal AXF CLI and
+filesystem/control-plane flows. The MCP server reloads registry state
+per request, so external AXF updates become visible on later MCP calls
+without restarting the server.
+
+Full CLI parity may be considered later behind explicit policy and
+approval gates.
 
 Lex appears through AXF only when the bound AXF workspace discovers or
 mounts Lex capabilities such as `global.lex.*` or `toolspace.ops.lex.*`.
