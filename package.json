@@ -1,6 +1,6 @@
 {
   "name": "@smartergpt/axf",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "type": "module",
   "description": "Manifest-driven AXF capability router with CLI and MCP entrypoints.",
@@ -34,6 +34,7 @@
   "bugs": {
     "url": "https://github.com/Guffawaffle/ax-framework/issues"
   },
+  "mcpName": "dev.smartergpt/axf",
   "license": "SEE LICENSE IN LICENSE",
   "publishConfig": {
     "access": "public"
