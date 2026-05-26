@@ -1,9 +1,28 @@
 # axf
 
-A manifest-driven capability router and scaffolding framework. axf
-provides a small command surface, explicit manifests, adapter-based
-execution, lifecycle gates, and schema-validated args for workspace
-toolspaces.
+Workspace-native capability framework for coding agents.
+
+AXF gives teams a framework for building workspace-native agent
+exoskeletons: small, self-describing capabilities that encode how each
+codebase is built, tested, searched, diagnosed, and operated safely.
+
+The goal is not to automate judgment. The goal is to compress repeated
+local ceremony into reliable workspace capabilities, so agents can spend
+more attention on the actual problem.
+
+**When AXF helps**
+
+- agents keep guessing which build, test, or validation command applies
+- agents repeatedly search for the same repo facts before editing
+- local safety rules live in prose, convention, or human memory
+- brittle shell chains keep getting rebuilt for repo-specific chores
+
+**AXF is not**
+
+AXF is not a universal command catalog, a replacement for judgment, or
+an MCP-only product. It is a framework and control plane for
+workspace-owned capabilities. MCP is one adapter surface; workspaces own
+the repo-specific capabilities agents use as their local exoskeleton.
 
 > Status: **alpha**. The core loop is in place: scout, inspect,
 > execute, scaffold, and promote capabilities through one contract.
