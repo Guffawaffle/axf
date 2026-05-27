@@ -1,6 +1,6 @@
 {
   "name": "@smartergpt/axf",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": false,
   "type": "module",
   "description": "Manifest-driven AXF capability router with CLI and MCP entrypoints.",
