@@ -1,6 +1,6 @@
 {
   "name": "@smartergpt/axf",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": false,
   "type": "module",
   "description": "Agent eXoskeleton Framework control plane for workspace-native agent capabilities.",
@@ -34,11 +34,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Guffawaffle/ax-framework.git"
+    "url": "git+https://github.com/Guffawaffle/axf.git"
   },
   "homepage": "https://smartergpt.dev/axf",
   "bugs": {
-    "url": "https://github.com/Guffawaffle/ax-framework/issues"
+    "url": "https://github.com/Guffawaffle/axf/issues"
   },
   "mcpName": "dev.smartergpt/axf",
   "license": "SEE LICENSE IN LICENSE",
