@@ -1,10 +1,11 @@
-# axf
+# AXF
 
-Workspace-native capability framework for coding agents.
+Agent eXoskeleton Framework for workspace-native agent capabilities.
 
-AXF gives teams a framework for building workspace-native agent
-exoskeletons: small, self-describing capabilities that encode how each
-codebase is built, tested, searched, diagnosed, and operated safely.
+AXF (Agent eXoskeleton Framework) gives teams a framework for building
+workspace-native agent exoskeletons: small, self-describing capabilities
+that encode how each codebase is built, tested, searched, diagnosed,
+and operated safely.
 
 The goal is not to automate judgment. The goal is to compress repeated
 local ceremony into reliable workspace capabilities, so agents can spend
@@ -20,9 +21,10 @@ more attention on the actual problem.
 **AXF is not**
 
 AXF is not a universal command catalog, a replacement for judgment, or
-an MCP-only product. It is a framework and control plane for
-workspace-owned capabilities. MCP is one adapter surface; workspaces own
-the repo-specific capabilities agents use as their local exoskeleton.
+an MCP-only product. It is the framework and control plane for building
+workspace-native agent exoskeletons from workspace-owned capabilities.
+MCP is one adapter surface; workspaces own the repo-specific
+capabilities agents use as their local exoskeleton.
 
 > Status: **alpha**. The core loop is in place: scout, inspect,
 > execute, scaffold, and promote capabilities through one contract.
@@ -39,10 +41,10 @@ Permitted use is limited to personal, non-commercial evaluation,
 development, and local execution.
 
 Redistribution, resale, sublicensing, commercial use, business use,
-production use, internal organizational use, employer/client use, SaaS
-use, managed-service use, and embedding in another product, service,
-SDK, platform, agent, workflow system, or commercial tooling require a
-separate written license.
+production use, internal organizational use, SaaS use, managed-service
+use, and embedding in another product, service, SDK, platform, agent,
+workflow system, or commercial tooling require a separate written
+license.
 
 The npm package name is `@smartergpt/axf`. It installs two bins:
 
@@ -75,9 +77,9 @@ axf-mcp
 From a local clone, run the bins directly with Node:
 
 ```sh
-node /path/to/ax-framework/bin/axf.js doctor
-node /path/to/ax-framework/bin/axf.js mcp
-node /path/to/ax-framework/bin/axf-mcp.js
+node /path/to/axf/bin/axf.js doctor
+node /path/to/axf/bin/axf.js mcp
+node /path/to/axf/bin/axf-mcp.js
 ```
 
 A repo-local MCP configuration can either call the direct MCP bin or the
@@ -89,7 +91,7 @@ command arguments cleanly:
   "mcpServers": {
     "axf": {
       "command": "node",
-      "args": ["/path/to/ax-framework/bin/axf.js", "mcp"],
+      "args": ["/path/to/axf/bin/axf.js", "mcp"],
       "cwd": "/path/to/workspace",
       "env": {
         "AXF_WORKSPACE": "/path/to/workspace"
@@ -106,7 +108,7 @@ Direct-bin configs remain valid:
   "mcpServers": {
     "axf": {
       "command": "node",
-      "args": ["/path/to/ax-framework/bin/axf-mcp.js"],
+      "args": ["/path/to/axf/bin/axf-mcp.js"],
       "cwd": "/path/to/workspace",
       "env": {
         "AXF_WORKSPACE": "/path/to/workspace"

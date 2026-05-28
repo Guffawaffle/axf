@@ -3,6 +3,10 @@
 This is the recommended path for bringing a repository onto AXF without
 copying bespoke Lex wrapper scripts into every repo.
 
+AXF provides the workspace-native agent exoskeleton framework and
+control plane. The repository owns the capabilities that describe how it
+is built, tested, searched, diagnosed, and operated safely.
+
 ## 1. Add the workspace marker first
 
 Create `axf.workspace.json` at the repo root.

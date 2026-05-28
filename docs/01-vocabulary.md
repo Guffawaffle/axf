@@ -1,12 +1,14 @@
-# axf Vocabulary and Terms Contract
+# AXF Vocabulary and Terms Contract
 
-This document freezes the baseline vocabulary for axf v0 planning.
+This document freezes the baseline vocabulary for AXF v0 planning.
+AXF means Agent eXoskeleton Framework. `axf` is the CLI and package
+identifier.
 
 If a later design doc uses different language for these ideas, prefer the terms here unless there is a deliberate replacement.
 
 ## Workspace
 
-A concrete repo, directory, or execution context in which axf is running.
+A concrete repo, directory, or execution context in which AXF is running.
 
 A workspace may declare:
 
@@ -17,7 +19,7 @@ A workspace may declare:
 
 ## Toolspace
 
-A domain-specific capability pack hosted by axf.
+A domain-specific capability pack hosted by AXF.
 
 Examples that may exist later:
 
@@ -89,22 +91,22 @@ A machine-readable contract that declares a capability, mount, or toolspace conf
 
 ## Provider
 
-A concrete external or internal system that axf can execute through an adapter.
+A concrete external or internal system that AXF can execute through an adapter.
 
 Examples:
-- an internal axf implementation
+- a built-in AXF implementation
 - a CLI on PATH
 - a library module
 - a future RPC/MCP service
 
 ## Adapter
 
-The bridge layer that lets axf resolve and execute capabilities against a provider.
+The bridge layer that lets AXF resolve and execute capabilities against a provider.
 
-Important: adapters are owned by axf's integration model, not by default by the provider.
+Important: adapters are owned by AXF's integration model, not by default by the provider.
 
-A provider does not need to implement an axf-specific hook just to be usable.
-axf should be able to bridge providers through supported adapter types.
+A provider does not need to implement an AXF-specific hook just to be usable.
+AXF should be able to bridge providers through supported adapter types.
 
 ## Lifecycle state
 
@@ -118,7 +120,7 @@ Baseline states:
 
 ## Resolution
 
-The process axf uses to turn a human CLI path into a fully qualified capability ID and then into a concrete execution target.
+The process AXF uses to turn a human CLI path into a fully qualified capability ID and then into a concrete execution target.
 
 ## Internal rule
 

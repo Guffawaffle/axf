@@ -3,7 +3,7 @@
   "version": "0.1.7",
   "private": false,
   "type": "module",
-  "description": "Manifest-driven AXF capability router with CLI and MCP entrypoints.",
+  "description": "Agent eXoskeleton Framework control plane for workspace-native agent capabilities.",
   "bin": {
     "axf": "./bin/axf.js",
     "axf-mcp": "./bin/axf-mcp.js"
