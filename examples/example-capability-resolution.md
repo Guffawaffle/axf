@@ -42,38 +42,39 @@ The `toy` toolspace mount remaps `global.echo` under
 target stays the same, but the resolved ID, defaults, and policy
 surface can differ from the global capability.
 
-## 3. Provider-adapter capability — `majel status`
+## 3. Imported CLI family capability — `lex status`
 
 ```
-axf run majel status
+axf run lex status
 ```
 
-Parsed path: scope `global`, module `majel`, capability `status`.
-Resolved ID: `global.majel.status` (lifecycleState `active`).
+Parsed path: scope `global`, module `lex`, capability `status`.
+Resolved ID: `global.lex.status` (lifecycleState `active`).
 
 Execution plan:
 - type adapter: `cli`
-- provider adapter: `majel` (composes `cli`)
-- execution target: command + args declared in the capability manifest
+- provider adapter: none
+- execution target: `lex introspect --json --format compact`, declared
+  in the imported Lex family manifest
 
-Provider adapter unwraps a provider envelope:
+The registry synthesizes this capability from
+`manifests/families/lex.family.json`. Lex is the reference capability
+family being routed by AXF; AXF remains the resolver, lifecycle, policy,
+adapter, and executor control plane.
+
+The generic `cli` adapter parses JSON stdout when the provider emits it:
 ```js
-// Provider emits:
-{ command: "<status>", success: true, durationMs: 78, data: { ... } }
-
-// axf returns:
 {
   ok: true,
   data: { ... },
   meta: {
-    capabilityId: "global.majel.status",
+    capabilityId: "global.lex.status",
     adapterType: "cli",
-    providerAdapter: "majel",
-    majel: { command: "<status>", durationMs: 78, timestamp: "..." }
+    command: "lex"
   }
 }
 ```
 
-When the provider reports `success: false`, the provider adapter maps
-that to `{ ok: false, error: { message }, meta }` while preserving any
-non-fatal hints on `meta`.
+Other synthesized Lex capabilities follow the same route, including
+`global.lex.recall`, `global.lex.search`, `global.lex.policy-check`,
+`global.lex.remember`, `global.lex.log-frame`, and `global.lex.note`.

@@ -2,17 +2,17 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "dev.smartergpt/axf",
   "title": "AXF",
-  "description": "Manifest-driven AXF capability router for workspace MCP access.",
+  "description": "Agent eXoskeleton Framework control plane for workspace-native agent capabilities over MCP.",
   "repository": {
-    "url": "https://github.com/Guffawaffle/ax-framework",
+    "url": "https://github.com/Guffawaffle/axf",
     "source": "github"
   },
-  "version": "0.1.6",
+  "version": "0.1.8",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@smartergpt/axf",
-      "version": "0.1.6",
+      "version": "0.1.8",
       "transport": {
         "type": "stdio"
       },

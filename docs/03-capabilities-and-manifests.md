@@ -1,18 +1,18 @@
-# Capabilities and Manifest Model
+# AXF Capabilities and Manifest Model
 
 ## Goal
 
-Every runnable unit in axf should be declared before it is trusted.
+Every runnable unit in AXF should be declared before it is trusted.
 
-The manifest layer is the contract that lets:
+The manifest layer is the framework/control-plane contract that lets:
 - humans inspect a capability
 - agents scaffold safely
-- axf resolve consistently
+- AXF resolve consistently
 - policies enforce lifecycle state and side effects
 
 ## Capability identity
 
-Human syntax may be short, but axf should resolve to a fully qualified capability ID.
+Human syntax may be short, but AXF should resolve to a fully qualified capability ID.
 
 Examples:
 
@@ -110,14 +110,14 @@ The resolver should:
 
 ## Why this matters
 
-Without manifests:
+Without AXF manifests:
 - agents guess
 - naming drifts
 - output contracts drift
 - side effects become unclear
 - mounts become hand-wavy shell wrappers
 
-With manifests:
+With AXF manifests:
 - the system becomes inspectable
 - scaffold generation becomes reliable
 - lifecycle promotion becomes meaningful

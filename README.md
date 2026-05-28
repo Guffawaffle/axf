@@ -1,10 +1,11 @@
-# axf
+# AXF
 
-Workspace-native capability framework for coding agents.
+Agent eXoskeleton Framework for workspace-native agent capabilities.
 
-AXF gives teams a framework for building workspace-native agent
-exoskeletons: small, self-describing capabilities that encode how each
-codebase is built, tested, searched, diagnosed, and operated safely.
+AXF (Agent eXoskeleton Framework) gives teams a framework for building
+workspace-native agent exoskeletons: small, self-describing capabilities
+that encode how each codebase is built, tested, searched, diagnosed,
+and operated safely.
 
 The goal is not to automate judgment. The goal is to compress repeated
 local ceremony into reliable workspace capabilities, so agents can spend
@@ -20,9 +21,10 @@ more attention on the actual problem.
 **AXF is not**
 
 AXF is not a universal command catalog, a replacement for judgment, or
-an MCP-only product. It is a framework and control plane for
-workspace-owned capabilities. MCP is one adapter surface; workspaces own
-the repo-specific capabilities agents use as their local exoskeleton.
+an MCP-only product. It is the framework and control plane for building
+workspace-native agent exoskeletons from workspace-owned capabilities.
+MCP is one adapter surface; workspaces own the repo-specific
+capabilities agents use as their local exoskeleton.
 
 > Status: **alpha**. The core loop is in place: scout, inspect,
 > execute, scaffold, and promote capabilities through one contract.
@@ -39,10 +41,10 @@ Permitted use is limited to personal, non-commercial evaluation,
 development, and local execution.
 
 Redistribution, resale, sublicensing, commercial use, business use,
-production use, internal organizational use, employer/client use, SaaS
-use, managed-service use, and embedding in another product, service,
-SDK, platform, agent, workflow system, or commercial tooling require a
-separate written license.
+production use, internal organizational use, SaaS use, managed-service
+use, and embedding in another product, service, SDK, platform, agent,
+workflow system, or commercial tooling require a separate written
+license.
 
 The npm package name is `@smartergpt/axf`. It installs two bins:
 
@@ -75,9 +77,9 @@ axf-mcp
 From a local clone, run the bins directly with Node:
 
 ```sh
-node /path/to/ax-framework/bin/axf.js doctor
-node /path/to/ax-framework/bin/axf.js mcp
-node /path/to/ax-framework/bin/axf-mcp.js
+node /path/to/axf/bin/axf.js doctor
+node /path/to/axf/bin/axf.js mcp
+node /path/to/axf/bin/axf-mcp.js
 ```
 
 A repo-local MCP configuration can either call the direct MCP bin or the
@@ -89,7 +91,7 @@ command arguments cleanly:
   "mcpServers": {
     "axf": {
       "command": "node",
-      "args": ["/path/to/ax-framework/bin/axf.js", "mcp"],
+      "args": ["/path/to/axf/bin/axf.js", "mcp"],
       "cwd": "/path/to/workspace",
       "env": {
         "AXF_WORKSPACE": "/path/to/workspace"
@@ -106,7 +108,7 @@ Direct-bin configs remain valid:
   "mcpServers": {
     "axf": {
       "command": "node",
-      "args": ["/path/to/ax-framework/bin/axf-mcp.js"],
+      "args": ["/path/to/axf/bin/axf-mcp.js"],
       "cwd": "/path/to/workspace",
       "env": {
         "AXF_WORKSPACE": "/path/to/workspace"
@@ -262,10 +264,10 @@ authoritative mutation and control plane for commands such as `init`,
 `promote`, `demote`, `scout --write`, and other registry/materialization
 flows.
 
-Capabilities such as `global.lex.status` and `global.stfc-mod.status`
-are not separate MCP tools. Use `operation=help` to learn the router
-contract, `operation=list` to discover capabilities, and
-`operation=inspect` before `operation=run`. Treat capability
+Capabilities such as `global.lex.status` and `global.echo.say` are not
+separate MCP tools. Use `operation=help` to learn the router contract,
+`operation=list` to discover capabilities, and `operation=inspect`
+before `operation=run`. Treat capability
 `lifecycleState`, `sideEffects`, `policies`, and workspace binding as
 part of the execution contract.
 
@@ -283,24 +285,37 @@ approval gates.
 
 Lex appears through AXF only when the bound AXF workspace discovers or
 mounts Lex capabilities such as `global.lex.*` or `toolspace.ops.lex.*`.
+
 ## What's wired up
 
 ### Built-in adapters
 
+AXF ships two public built-in adapter types:
+
 - **`internal`** — runs handlers in-process (`adapters/internal/`)
 - **`cli`** — generic subprocess dispatcher with stdout JSON parsing
   (`adapters/cli/`)
-- **`majel`** (provider) — the current provider-adapter example layered
-  on top of `cli` (`adapters/majel/`)
+
+The standard Lex capability family uses the generic `cli` adapter. It
+does not require a dedicated Lex adapter.
 
 ### Built-in capabilities
 
 | Capability | Provider | Lifecycle | Notes |
 |---|---|---|---|
 | `global.echo.say` | internal | active | smallest in-process capability example |
-| `global.lex.*` | cli | active | imported Lex family pack: status/introspect/recall/search/policy-check plus write-classified remember/log-frame/note |
-| `global.majel.status` | cli + majel | active | sample provider-adapter status capability |
-| `global.majel.diff` | cli + majel | active | sample provider-adapter diff capability |
+| `global.lex.status` | Lex via cli | active | compact Lex state and health summary |
+| `global.lex.recall` | Lex via cli | active | recall frames by query or list recent frames |
+| `global.lex.search` | Lex via cli | active | search Lex frames by query |
+| `global.lex.policy-check` | Lex via cli | active | validate Lex policy files and optional module mapping |
+| `global.lex.remember` | Lex via cli | active | write-classified capture of a work-session frame |
+| `global.lex.log-frame` | Lex via cli | active | write-classified alias for frame logging |
+| `global.lex.note` | Lex via cli | active | write-classified alias for repo notes |
+
+Lex is a reference capability family routed by AXF. It demonstrates how
+workspace-native memory and policy capabilities can sit behind AXF's
+resolver, lifecycle, policy, adapter, and executor path without defining
+the framework itself.
 
 ### Toolspaces
 
@@ -339,9 +354,9 @@ axf run acme status --any-lifecycle
 
 The four canonical prompts under [`prompts/`](prompts/) walk an agent
 through discovery → planning → scaffolding → review against the actual
-file contract. The provider-adapter example under
-[`adapters/majel/`](adapters/majel/) is intentionally small and useful
-as a shape reference.
+file contract. JSON-first providers can usually use the generic `cli`
+adapter directly; provider adapters are for wrappers that need envelope,
+error, or argument normalization beyond the generic route.
 
 ## Layout
 
@@ -351,7 +366,7 @@ bin/axf.js                      # CLI entry (symlinked as /usr/local/bin/axf)
 src/cli/                        # CLI parsing + main dispatch
 src/core/                       # registry, resolver, executor, adapters, doctor, policy
 adapters/<type>/                # type adapters (internal, cli, ...)
-adapters/<provider>/            # provider adapters (majel, ...)
+adapters/<provider>/            # optional provider adapters for wrapped CLIs
 manifests/capabilities/         # capability manifests
 manifests/toolspaces/           # toolspace mount manifests
 prompts/                        # canonical prompts for agent-authored adapters

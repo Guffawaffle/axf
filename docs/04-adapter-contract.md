@@ -1,4 +1,4 @@
-# axf Adapter Contract
+# AXF Adapter Contract
 
 > Status: alpha — the two adapter kinds below are both implemented and
 > exercised by built-in and provider-wrapped examples. v0.1 may tighten
@@ -6,22 +6,22 @@
 
 ## Goal
 
-An axf adapter bridges a provider into axf's capability model.
+An AXF adapter bridges a provider into AXF's capability model.
 
 The provider may be:
 
-- an internal axf implementation (a function in this repo)
+- a built-in AXF implementation (a function in this repo)
 - a CLI tool
 - a library
 - later: an RPC or MCP surface
 
-The adapter is owned by axf's integration model. **A provider does not
-need to implement axf-specific hooks.** axf adapts to the provider, never
+The adapter is owned by AXF's integration model. **A provider does not
+need to implement AXF-specific hooks.** AXF adapts to the provider, never
 the reverse.
 
 ## Two adapter kinds
 
-axf recognizes two complementary kinds of adapter folder. They live
+AXF recognizes two complementary kinds of adapter folder. They live
 side-by-side under `adapters/`. The loader keys them differently and
 the executor composes them when both are involved.
 
@@ -104,7 +104,7 @@ Every adapter must answer:
 2. How is execution performed?
 3. How are args translated to the provider's calling convention?
 4. How are outputs normalized into the axf result shape above?
-5. What defaults or policies can axf inject safely?
+5. What defaults or policies can AXF inject safely?
 
 ## Worked examples in this repo
 
@@ -185,4 +185,4 @@ both scaffold a draft adapter against this contract. Agents are
 encouraged to drive the planning and scaffolding loop using the
 prompts under [`prompts/`](../prompts/). The contract is open on
 purpose: any agent that follows it can ship an adapter without privileged
-knowledge of the framework internals.
+knowledge of AXF framework internals.

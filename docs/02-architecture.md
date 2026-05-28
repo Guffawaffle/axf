@@ -1,8 +1,8 @@
-# axf Architecture Overview
+# AXF Architecture Overview
 
 ## Architecture statement
 
-axf should be built as a small platform with clear layers.
+AXF should be built as a small platform with clear layers.
 
 The layers are:
 
@@ -75,7 +75,7 @@ It is a lookup path.
 ### `axf echo ...`
 
 This means:
-- use the global `echo` module exposed through axf
+- use the global `echo` module exposed through AXF
 - no toolspace-local mount is assumed
 - global defaults and policies apply
 
@@ -88,7 +88,7 @@ This means:
 
 These are not equivalent by definition.
 
-Even if the first implementation proxies one through the other, axf should preserve the distinction internally.
+Even if the first implementation proxies one through the other, AXF should preserve the distinction internally.
 
 ## Resolution order
 
@@ -102,15 +102,15 @@ This allows toolspaces and workspaces to narrow or override broader behavior in 
 
 ## Why axf owns the mount model
 
-Mounted modules should be resolved by axf through declared manifests and adapter bindings.
+Mounted modules should be resolved by AXF through declared manifests and adapter bindings.
 
-Providers do not need to implement axf-specific hooks unless they want richer native integration.
+Providers do not need to implement AXF-specific hooks unless they want richer native integration.
 
-This keeps axf open without making every provider responsible for axf internals.
+This keeps AXF open without making every provider responsible for AXF internals.
 
 ## Provider integration stance
 
-axf should support multiple adapter styles:
+AXF should support multiple adapter styles:
 
 - `internal`
 - `cli`

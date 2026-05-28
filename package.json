@@ -1,9 +1,9 @@
 {
   "name": "@smartergpt/axf",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": false,
   "type": "module",
-  "description": "Manifest-driven AXF capability router with CLI and MCP entrypoints.",
+  "description": "Agent eXoskeleton Framework control plane for workspace-native agent capabilities.",
   "bin": {
     "axf": "./bin/axf.js",
     "axf-mcp": "./bin/axf-mcp.js"
@@ -34,11 +34,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Guffawaffle/ax-framework.git"
+    "url": "git+https://github.com/Guffawaffle/axf.git"
   },
   "homepage": "https://smartergpt.dev/axf",
   "bugs": {
-    "url": "https://github.com/Guffawaffle/ax-framework/issues"
+    "url": "https://github.com/Guffawaffle/axf/issues"
   },
   "mcpName": "dev.smartergpt/axf",
   "license": "SEE LICENSE IN LICENSE",

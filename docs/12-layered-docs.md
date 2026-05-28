@@ -1,6 +1,6 @@
 # Documentation Layers
 
-axf documentation is split into three audiences. Read only what you need.
+AXF documentation is split into three audiences. Read only what you need.
 
 ## Caller — uses capabilities someone else defined
 
@@ -23,7 +23,7 @@ a provider or building the framework itself.
 ## Integrator — wires a provider into a workspace
 
 You bring a provider's command vocabulary (git, gh, kubectl, your
-own CLI) into axf so other people can call it through a single
+own CLI) into AXF so other people can call it through a single
 contract.
 
 Read in this order:
@@ -52,7 +52,7 @@ import → inspect → refine → materialize (only what you must) → promote
 ## Author — extends the framework itself
 
 You add or change framework internals (loaders, validators, type
-adapters that ship with axf, drift detectors).
+adapters that ship with AXF, drift detectors).
 
 Read in this order:
 
