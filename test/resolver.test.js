@@ -8,6 +8,7 @@ import { createRegistry } from "../src/core/registry.js";
 import { resolveCapability } from "../src/core/resolver.js";
 import { executeResolvedCapability } from "../src/core/executor.js";
 import { loadAdapters } from "../src/core/adapter-loader.js";
+import { UnknownCapabilityError } from "../src/core/errors.js";
 
 const rootDir = fileURLToPath(new URL("..", import.meta.url));
 
@@ -113,6 +114,27 @@ test("schema coerces string-numerics from the CLI into integers", async () => {
         allowDraft: true
     });
     assert.equal(resolved.args.list, 5);
+});
+
+test("unknown fully qualified capability prefixes suggest runnable capabilities", async () => {
+    const { registry } = await ctx();
+
+    assert.throws(
+        () => registry.resolveInspectable(["global.lex"]),
+        (error) => {
+            assert.equal(error instanceof UnknownCapabilityError, true);
+            assert.equal(error.code, "UNKNOWN_CAPABILITY");
+            assert.equal(error.details.reason, "capability_prefix");
+            assert.equal(error.details.prefix, "global.lex");
+            assert.ok(
+                error.details.suggestions.some(
+                    (suggestion) => suggestion.id === "global.lex.status"
+                )
+            );
+            assert.match(error.message, /not a runnable capability/);
+            return true;
+        }
+    );
 });
 
 test("framework flags are stripped from validated args", async () => {
