@@ -13,7 +13,7 @@ import { prepareCommandInvocation } from "../src/core/command-invocation.js";
 import { resolveCliLaunchPlan } from "../src/core/cli-launch-plan.js";
 
 const frameworkRoot = fileURLToPath(new URL("..", import.meta.url));
-const LEX_CLI_TARGET = "node_modules/@smartergpt/lex/dist/shared/cli/lex.js";
+const ESLINT_CLI_TARGET = "node_modules/eslint/bin/eslint.js";
 
 test("cli adapter resolves a framework-relative target through a declared launcher", async () => {
   const framework = await mkdtemp(path.join(os.tmpdir(), "ax-cli-framework-"));
@@ -69,14 +69,14 @@ test("cli adapter resolves hoisted framework dependency targets", async () => {
   try {
     const launchPlan = resolveCliLaunchPlan(
       {
-        id: "global.lex.note",
+        id: "global.eslint.check",
         executionTarget: {
           launcher: { command: process.execPath },
           target: {
-            path: LEX_CLI_TARGET,
+            path: ESLINT_CLI_TARGET,
             relativeTo: "framework",
           },
-          args: ["remember", "--json"],
+          args: ["--version"],
         },
       },
       {
@@ -87,12 +87,12 @@ test("cli adapter resolves hoisted framework dependency targets", async () => {
       },
     );
 
-    assert.equal(launchPlan.targetSource, "package:@smartergpt/lex");
+    assert.equal(launchPlan.targetSource, "package:eslint");
     assert.equal(launchPlan.argsPrefix[0], launchPlan.targetPath);
-    assert.equal(path.basename(launchPlan.targetPath), "lex.js");
+    assert.equal(path.basename(launchPlan.targetPath), "eslint.js");
     assert.match(
       launchPlan.targetPath,
-      /node_modules[/\\]@smartergpt[/\\]lex[/\\]dist[/\\]shared[/\\]cli[/\\]lex\.js$/,
+      /node_modules[/\\]eslint[/\\]bin[/\\]eslint\.js$/,
     );
   } finally {
     await rm(framework, { recursive: true, force: true });

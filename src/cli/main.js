@@ -1,6 +1,6 @@
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
-import { createRegistry } from "../core/registry.js";
+import { createRegistry, MACHINE_ROOT_ENV } from "../core/registry.js";
 import { resolveCapability } from "../core/resolver.js";
 import { executeResolvedCapability } from "../core/executor.js";
 import { inspectRegistry } from "../core/doctor.js";
@@ -104,6 +104,7 @@ export async function main(argv, env = {}) {
   const registry = await createRegistry({
     rootDir,
     enableFrameworkGlobals: workspaces.registryWorkspace.viaMarker,
+    machineRoot: processEnv[MACHINE_ROOT_ENV],
   });
 
   if (command === "list") {
@@ -357,8 +358,11 @@ async function inspectCommand(
     console.log(`origin: ${cap.origin}`);
   }
   if (cap.sourceFamily) {
+    const layerText = cap.sourceFamily.layer
+      ? `, ${cap.sourceFamily.layer}`
+      : "";
     console.log(
-      `family: ${cap.sourceFamily.family}.${cap.sourceFamily.command} (${cap.sourceFamily.manifestPath})`,
+      `family: ${cap.sourceFamily.family}.${cap.sourceFamily.command} (${cap.sourceFamily.manifestPath}${layerText})`,
     );
   }
   if (cap.argMap && Object.keys(cap.argMap).length > 0) {
@@ -802,7 +806,8 @@ async function doctorCommand(
       executionWorkspace: workspaces?.executionWorkspace ?? null,
     },
   );
-  if (workspaceSummary.projectRoot) report.projectRoot = workspaceSummary.projectRoot;
+  if (workspaceSummary.projectRoot)
+    report.projectRoot = workspaceSummary.projectRoot;
   if (workspaceSummary.executionRoot) {
     report.executionRoot = workspaceSummary.executionRoot;
   }
@@ -858,6 +863,25 @@ async function doctorCommand(
   console.log(`capabilities: ${report.capabilityCount}`);
   console.log(`toolspaces: ${report.toolspaceCount}`);
   console.log(`adapters: ${report.adapterCount}`);
+  if (report.families?.length > 0) {
+    console.log("families:");
+    for (const family of report.families) {
+      console.log(
+        `  - ${family.scope}.${family.family} (${family.layer}: ${family.manifestPath})`,
+      );
+    }
+  }
+  if (report.shadowedFamilies?.length > 0) {
+    console.log("shadowed families:");
+    for (const family of report.shadowedFamilies) {
+      const winner = family.shadowedBy
+        ? ` -> ${family.shadowedBy.layer}:${family.shadowedBy.manifestPath}`
+        : "";
+      console.log(
+        `  - ${family.scope}.${family.family} (${family.layer}: ${family.manifestPath})${winner}`,
+      );
+    }
+  }
   if (report.adaptersByType?.length > 0) {
     for (const a of report.adaptersByType) {
       const id =

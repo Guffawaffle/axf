@@ -12,29 +12,144 @@ import { loadFamilies, synthesizeFamilyCapabilities } from "./family-loader.js";
 
 export const SUPPORTED_MANIFEST_VERSIONS = new Set(["axf/v0"]);
 
+export const MACHINE_ROOT_ENV = "AXF_MACHINE_ROOT";
+
+export const REGISTRY_LAYER_PRECEDENCE = Object.freeze({
+  framework: 10,
+  machine: 20,
+  project: 30,
+});
+
 export const FRAMEWORK_MANIFESTS_ROOT = fileURLToPath(
   new URL("../../manifests/", import.meta.url),
 );
-
-const FRAMEWORK_GLOBAL_FAMILIES = new Set(["lex"]);
 
 export async function createRegistry({
   rootDir,
   strict = true,
   enableFrameworkGlobals = false,
+  enableFrameworkBuiltins = enableFrameworkGlobals,
   frameworkManifestsRoot = FRAMEWORK_MANIFESTS_ROOT,
+  machineRoot = null,
+  machineRoots = [],
 } = {}) {
   const manifestRoot = path.join(rootDir, "manifests");
   const registry = new ManifestRegistry(rootDir, { strict });
-  await registry.loadFrom(manifestRoot);
-  await registry.loadFamiliesFrom(path.join(manifestRoot, "families"));
-  if (enableFrameworkGlobals && frameworkManifestsRoot) {
+
+  if (enableFrameworkBuiltins && frameworkManifestsRoot) {
     const sameRoot = await pathsEqual(manifestRoot, frameworkManifestsRoot);
     if (!sameRoot) {
-      await registry.loadFrameworkGlobalsFrom(frameworkManifestsRoot);
+      await registry.loadLayer({
+        manifestsRoot: frameworkManifestsRoot,
+        layerRoot: path.dirname(frameworkManifestsRoot),
+        layer: "framework",
+      });
     }
   }
+
+  for (const root of normalizeRoots([machineRoot, ...machineRoots])) {
+    const machineManifestsRoot = path.join(root, "manifests");
+    const sameAsProject = await pathsEqual(manifestRoot, machineManifestsRoot);
+    const sameAsFramework = frameworkManifestsRoot
+      ? await pathsEqual(frameworkManifestsRoot, machineManifestsRoot)
+      : false;
+    if (sameAsProject || sameAsFramework) continue;
+    await registry.loadLayer({
+      manifestsRoot: machineManifestsRoot,
+      layerRoot: root,
+      layer: "machine",
+    });
+  }
+
+  await registry.loadLayer({
+    manifestsRoot: manifestRoot,
+    layerRoot: rootDir,
+    layer: "project",
+  });
+  registry.finalizeFamilies();
   return registry;
+}
+
+function normalizeRoots(roots) {
+  return roots.filter(Boolean).map((root) => path.resolve(root));
+}
+
+function compareLayers(left, right) {
+  return (
+    (REGISTRY_LAYER_PRECEDENCE[left] ?? 0) -
+    (REGISTRY_LAYER_PRECEDENCE[right] ?? 0)
+  );
+}
+
+function formatLayerPath(relativePath, layer) {
+  return layer === "project" ? relativePath : `${layer}:${relativePath}`;
+}
+
+function familyKey(family) {
+  return `${family.scope ?? "global"}:${family.family}`;
+}
+
+function resolveFamilyCandidates(candidates) {
+  const byKey = new Map();
+  for (const family of candidates) {
+    const key = familyKey(family);
+    const list = byKey.get(key) ?? [];
+    list.push(family);
+    byKey.set(key, list);
+  }
+
+  const effective = [];
+  const shadowed = [];
+  const conflicts = [];
+
+  for (const list of byKey.values()) {
+    const sorted = [...list].sort((left, right) => {
+      const precedence = compareLayers(right.layer, left.layer);
+      if (precedence !== 0) return precedence;
+      return left.manifestPath.localeCompare(right.manifestPath);
+    });
+    const winningLayer = sorted[0].layer;
+    const winners = sorted.filter((family) => family.layer === winningLayer);
+    if (winners.length > 1) {
+      conflicts.push({
+        family: sorted[0].family,
+        scope: sorted[0].scope ?? "global",
+        layer: winningLayer,
+        manifestPaths: winners.map((family) => family.manifestPath).sort(),
+      });
+      shadowed.push(
+        ...sorted.filter((family) => family.layer !== winningLayer),
+      );
+      continue;
+    }
+
+    const [winner] = winners;
+    effective.push(winner);
+    shadowed.push(
+      ...sorted
+        .filter((family) => family !== winner)
+        .map((family) => ({
+          ...family,
+          shadowedBy: {
+            family: winner.family,
+            scope: winner.scope ?? "global",
+            layer: winner.layer,
+            manifestPath: winner.manifestPath,
+          },
+        })),
+    );
+  }
+
+  effective.sort((left, right) => {
+    const familyOrder = left.family.localeCompare(right.family);
+    if (familyOrder !== 0) return familyOrder;
+    return (left.scope ?? "global").localeCompare(right.scope ?? "global");
+  });
+  shadowed.sort((left, right) =>
+    left.manifestPath.localeCompare(right.manifestPath),
+  );
+
+  return { effective, shadowed, conflicts };
 }
 
 async function pathsEqual(a, b) {
@@ -51,41 +166,96 @@ export class ManifestRegistry {
     this.rootDir = rootDir;
     this.strict = strict;
     this.capabilities = new Map();
+    this.capabilityLayers = new Map();
     this.toolspaces = new Map();
     this.families = [];
+    this.familyCandidates = [];
+    this.shadowedFamilies = [];
+    this.familyConflicts = [];
     this.files = [];
+    this.projectFiles = [];
     this.loadIssues = [];
     this.rejected = [];
   }
 
-  async loadFrom(manifestRoot) {
+  async loadLayer({ manifestsRoot, layerRoot, layer }) {
+    await this.loadFrom(manifestsRoot, { layerRoot, layer });
+    await this.loadFamiliesFrom(path.join(manifestsRoot, "families"), {
+      layerRoot,
+      layer,
+    });
+  }
+
+  async loadFrom(
+    manifestRoot,
+    { layerRoot = this.rootDir, layer = "project" } = {},
+  ) {
     const files = await listJsonFiles(manifestRoot, { skipDirs: ["families"] });
-    this.files = files;
+    this.files.push(...files);
+    if (layer === "project") {
+      this.projectFiles.push(...files);
+    }
 
     for (const filePath of files) {
-      await this.loadFile(filePath);
+      await this.loadFile(filePath, { layerRoot, layer });
     }
   }
 
-  async loadFamiliesFrom(familiesRoot) {
+  async loadFamiliesFrom(
+    familiesRoot,
+    { layerRoot = this.rootDir, layer = "project" } = {},
+  ) {
     const { families, issues } = await loadFamilies({
       familiesRoot,
-      rootDir: this.rootDir,
+      rootDir: layerRoot,
     });
     this.loadIssues.push(...issues);
-    this.families = families;
-    const existingIds = new Set(this.capabilities.keys());
     for (const family of families) {
-      const synthesized = synthesizeFamilyCapabilities(family, { existingIds });
+      this.familyCandidates.push({
+        ...family,
+        manifestPath: formatLayerPath(family.manifestPath, layer),
+        layer,
+        provenance: layer,
+      });
+    }
+  }
+
+  finalizeFamilies() {
+    const { effective, shadowed, conflicts } = resolveFamilyCandidates(
+      this.familyCandidates,
+    );
+    this.families = effective;
+    this.shadowedFamilies = shadowed;
+    this.familyConflicts = conflicts;
+    this.loadIssues.push(
+      ...conflicts.map((conflict) => ({
+        severity: "error",
+        message: `family conflict: ${conflict.layer} layer declares '${conflict.family}' more than once (${conflict.manifestPaths.join(", ")})`,
+      })),
+    );
+
+    for (const family of effective) {
+      const protectedIds = new Set(
+        [...this.capabilities.keys()].filter(
+          (id) =>
+            compareLayers(this.capabilityLayers.get(id), family.layer) >= 0,
+        ),
+      );
+      const synthesized = synthesizeFamilyCapabilities(family, {
+        existingIds: protectedIds,
+      });
       for (const cap of synthesized) {
-        // Materialized capability already loaded? Skip; that file wins.
-        if (this.capabilities.has(cap.id)) continue;
+        const existingLayer = this.capabilityLayers.get(cap.id);
+        if (existingLayer && compareLayers(existingLayer, family.layer) >= 0) {
+          continue;
+        }
         this.capabilities.set(cap.id, cap);
+        this.capabilityLayers.set(cap.id, family.layer);
       }
     }
     // Mark capabilities whose id matches a family entry: they are
     // materialized overrides of an imported command.
-    for (const family of families) {
+    for (const family of effective) {
       const scope = family.scope ?? "global";
       const idPrefix = scope === "workspace-local" ? "workspace" : "global";
       for (const cmdKey of Object.keys(family.commands)) {
@@ -93,49 +263,26 @@ export class ManifestRegistry {
         const declared = this.capabilities.get(id);
         if (declared && declared.origin !== "imported") {
           declared.origin = "materialized";
-          declared.sourceFamily = declared.sourceFamily ?? {
+          declared.sourceFamily = {
             family: family.family,
             command: cmdKey,
             manifestPath: family.manifestPath,
+            ...(declared.sourceFamily ?? {}),
+            layer: family.layer,
           };
         }
       }
     }
   }
 
-  async loadFrameworkGlobalsFrom(frameworkManifestsRoot) {
-    const frameworkRoot = path.dirname(frameworkManifestsRoot);
-    const { families, issues } = await loadFamilies({
-      familiesRoot: path.join(frameworkManifestsRoot, "families"),
-      rootDir: frameworkRoot,
-    });
-    this.loadIssues.push(...issues);
-
-    const existingIds = new Set(this.capabilities.keys());
-    for (const family of families) {
-      if ((family.scope ?? "global") !== "global") continue;
-      if (!FRAMEWORK_GLOBAL_FAMILIES.has(family.family)) continue;
-
-      const frameworkFamily = {
-        ...family,
-        manifestPath: `framework:${family.manifestPath}`,
-        provenance: "framework",
-      };
-      this.families.push(frameworkFamily);
-      const synthesized = synthesizeFamilyCapabilities(frameworkFamily, {
-        existingIds,
-        origin: "framework",
-      });
-      for (const cap of synthesized) {
-        if (this.capabilities.has(cap.id)) continue;
-        this.capabilities.set(cap.id, cap);
-        existingIds.add(cap.id);
-      }
-    }
-  }
-
-  async loadFile(filePath) {
-    const relativePath = path.relative(this.rootDir, filePath);
+  async loadFile(
+    filePath,
+    { layerRoot = this.rootDir, layer = "project" } = {},
+  ) {
+    const relativePath = formatLayerPath(
+      path.relative(layerRoot, filePath),
+      layer,
+    );
     let manifest;
     try {
       manifest = JSON.parse(await readFile(filePath, "utf8"));
@@ -156,10 +303,16 @@ export class ManifestRegistry {
         return;
       }
       this.loadIssues.push(...issues);
-      this.capabilities.set(manifest.id, {
-        ...manifest,
-        manifestPath: relativePath,
-      });
+      this.setCapability(
+        manifest.id,
+        {
+          ...manifest,
+          manifestPath: relativePath,
+          layer,
+          provenance: layer,
+        },
+        layer,
+      );
       return;
     }
 
@@ -174,6 +327,8 @@ export class ManifestRegistry {
       this.toolspaces.set(manifest.toolspace, {
         ...manifest,
         manifestPath: relativePath,
+        layer,
+        provenance: layer,
       });
       return;
     }
@@ -183,6 +338,22 @@ export class ManifestRegistry {
       message: `${relativePath} is not a recognized axf manifest (no 'id' or 'toolspace' field)`,
     });
     this.rejected.push(relativePath);
+  }
+
+  setCapability(id, capability, layer) {
+    const existingLayer = this.capabilityLayers.get(id);
+    if (existingLayer && compareLayers(existingLayer, layer) === 0) {
+      this.loadIssues.push({
+        severity: "error",
+        message: `capability conflict: ${layer} layer declares '${id}' more than once`,
+      });
+      return;
+    }
+    if (existingLayer && compareLayers(existingLayer, layer) > 0) {
+      return;
+    }
+    this.capabilities.set(id, capability);
+    this.capabilityLayers.set(id, layer);
   }
 
   hasToolspace(name) {
@@ -344,7 +515,8 @@ export class ManifestRegistry {
         nextSteps: [
           {
             action: "inspect_capability",
-            description: "Inspect one of the suggested runnable capability ids.",
+            description:
+              "Inspect one of the suggested runnable capability ids.",
             example: suggestionIds[0],
           },
           {

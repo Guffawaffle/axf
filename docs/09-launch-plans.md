@@ -28,8 +28,8 @@ The command is a literal program name on PATH. No target file.
 }
 ```
 
-`relativeTo: "workspace"` joins the path under the resolved workspace
-root at runtime. `relativeTo: "framework"` joins the path under the AXF
+`relativeTo: "workspace"` joins the path under the resolved project root
+at runtime. `relativeTo: "framework"` joins the path under the AXF
 package root, which is useful for framework-owned capabilities that
 must launch bundled runtime dependencies without relying on global
 shims. The cli adapter uses the resolved absolute path as the command
@@ -51,7 +51,7 @@ argument.
 ```
 
 If `LEX_HOME` is set, the path is resolved under it. Otherwise the
-fallback root is used (workspace-relative if `fallbackRelativeTo:
+fallback root is used (project-root-relative if `fallbackRelativeTo:
 "workspace"`).
 
 ### Custom launcher
@@ -70,10 +70,10 @@ interpreter-fronted scripts (PowerShell, Python, Node, Ruby).
 
 ### Working directory
 
-CLI capabilities run from the bound AXF workspace root by default. This
+CLI capabilities run from the bound AXF execution root by default. This
 keeps provider tools that discover project state from `process.cwd()`
-anchored to the same workspace AXF resolved, even when the user invokes
-`axf --workspace <repo>` from another directory.
+anchored to the caller-facing execution root, even when AXF resolves the
+capability target from a different project root.
 
 Manifests may override the working directory explicitly:
 
@@ -87,10 +87,12 @@ Manifests may override the working directory explicitly:
 }
 ```
 
-`executionTarget.cwd` may be an absolute string, a workspace-relative
+`executionTarget.cwd` may be an absolute string, an execution-root-relative
 string, or an object with `path` and `relativeTo`. Supported
-`relativeTo` values are `"workspace"` and `"process"`. If AXF has no
-bound workspace, the current process cwd is used.
+`relativeTo` values are `"workspace"` and `"process"`. For `cwd`,
+`relativeTo: "workspace"` resolves against the execution root; for
+target paths it resolves against the project root. If AXF has no bound
+execution root, the current process cwd is used.
 
 ## Inspection
 
@@ -106,7 +108,7 @@ capability:
     "resolvedCommand": "pwsh",
     "commandSource": "path:...",
     "launchStrategy": "direct",
-    "cwd": "/abs/workspace",
+    "cwd": "/abs/execution-root",
     "cwdSource": "workspace",
     "targetPath": "/abs/scripts/build.ps1",
     "targetSource": "relative:workspace"
@@ -133,11 +135,11 @@ and resolves the platform detail at launch time:
 This keeps repo manifests portable and avoids per-repo PowerShell
 wrapper scripts for standard npm-installed tools.
 
-The framework-owned `global.lex.*` family does not use this PATH-based
-shape. It launches `node` with a `target.relativeTo: "framework"` path
-to AXF's package-local `@smartergpt/lex` dependency, so framework-global
-Lex capabilities remain executable even when no global `lex` shim is on
-PATH.
+Optional shared packs can still choose a `target.relativeTo: "framework"`
+or env-bound target when they own that dependency, but AXF core no
+longer special-cases a package-local shared pack. Project-owned CLI
+capabilities should normally use PATH commands only when that tool is
+expected to exist in the caller's runtime.
 
 ## WSL diagnostics
 

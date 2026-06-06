@@ -144,8 +144,14 @@ test("help documents canonical project and execution root flags", async () => {
   const out = await captureStdout(() => main(["help"]));
   assert.match(out, /--project-root <path>/);
   assert.match(out, /--execution-root <path>/);
-  assert.match(out, /--registry-workspace <path>\s+Legacy alias for --project-root/);
-  assert.match(out, /--execution-workspace <path>\s+Legacy alias for --execution-root/);
+  assert.match(
+    out,
+    /--registry-workspace <path>\s+Legacy alias for --project-root/,
+  );
+  assert.match(
+    out,
+    /--execution-workspace <path>\s+Legacy alias for --execution-root/,
+  );
 });
 
 test("list --any-lifecycle includes drafts", async () => {
@@ -188,7 +194,9 @@ test("inspect resolves a workspace-local capability via shorthand", async () => 
 
 test("project-root and execution-root aliases drive split root behavior", async () => {
   const registryRoot = await bootstrap();
-  const executionRoot = await mkdtemp(path.join(os.tmpdir(), "ax-cli-execution-"));
+  const executionRoot = await mkdtemp(
+    path.join(os.tmpdir(), "ax-cli-execution-"),
+  );
   await mkdir(path.join(registryRoot, "tools"), { recursive: true });
   await writeFile(
     path.join(registryRoot, "tools", "cwd.mjs"),
