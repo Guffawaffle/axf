@@ -61,7 +61,8 @@ Read in this order:
 3. [04-adapter-contract.md](04-adapter-contract.md) — both kinds
 4. [08-adapter-folder-shape.md](08-adapter-folder-shape.md)
 5. [07-v0-bootstrap-plan.md](07-v0-bootstrap-plan.md)
-6. Source: `src/core/`, `adapters/`, `test/`
+6. [14-family-identity-and-layer-precedence-plan.md](14-family-identity-and-layer-precedence-plan.md)
+7. Source: `src/core/`, `adapters/`, `test/`
 
 Adopt the existing test style (`node:test`, zero deps, real tmp
 workspaces) for any new feature.

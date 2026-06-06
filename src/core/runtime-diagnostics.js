@@ -63,7 +63,9 @@ export function summarizeWorkspaceBinding(registry, workspace, options = {}) {
       `project root marker missing at '${workspace.root}'; scout-style binding checks cannot anchor to this repo until axf.workspace.json exists`,
     );
   }
-  if (registry.files.length === 0) {
+  const projectManifestCount =
+    registry.projectFiles?.length ?? registry.files.length;
+  if (projectManifestCount === 0) {
     notes.push(`project root '${workspace.root}' has no axf manifests yet`);
   }
 

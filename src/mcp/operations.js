@@ -4,7 +4,7 @@ import { prepareCommandInvocation } from "../core/command-invocation.js";
 import { inspectRegistry } from "../core/doctor.js";
 import { AxError } from "../core/errors.js";
 import { executeResolvedCapability } from "../core/executor.js";
-import { createRegistry } from "../core/registry.js";
+import { createRegistry, MACHINE_ROOT_ENV } from "../core/registry.js";
 import { resolveCapability } from "../core/resolver.js";
 import {
   collectRuntimeDiagnostics,
@@ -88,7 +88,7 @@ function performHelp(context) {
           "AXF MCP exposes one tool named axf as an agent-safe router over the current AXF registry.",
         capabilitiesAreSeparateTools: false,
         routingNote:
-          "Capabilities such as global.lex.status and global.stfc-mod.status are discovered through the single axf MCP tool, not exposed as separate MCP tools.",
+          "Capabilities such as global.echo.say are discovered through the single axf MCP tool, not exposed as separate MCP tools.",
         capabilityExamples: AXF_MCP_CAPABILITY_EXAMPLES,
         discoveryFlow: ["list", "inspect", "run"],
         runRules: [
@@ -254,6 +254,9 @@ async function performDoctor(context) {
     adapterCount: report.adapterCount,
     adaptersByType: report.adaptersByType,
     familyCount: report.familyCount,
+    families: report.families,
+    shadowedFamilies: report.shadowedFamilies,
+    familyConflicts: report.familyConflicts,
     drift: report.drift,
     issues,
     runtime: runtimeDiagnostics.runtime,
@@ -337,11 +340,13 @@ async function createContext(input, options) {
     env,
     explicit: input.workspace ?? undefined,
     registryExplicit: input.projectRoot ?? input.registryWorkspace ?? undefined,
-    executionExplicit: input.executionRoot ?? input.executionWorkspace ?? undefined,
+    executionExplicit:
+      input.executionRoot ?? input.executionWorkspace ?? undefined,
   });
   const registry = await createRegistry({
     rootDir: workspaces.registryWorkspace.root,
     enableFrameworkGlobals: workspaces.registryWorkspace.viaMarker,
+    machineRoot: env[MACHINE_ROOT_ENV],
   });
   const workspaceSummary = summarizeWorkspaceBinding(
     registry,
@@ -689,7 +694,7 @@ function buildRunDiscoveryNextSteps() {
   ];
 }
 
-function createInspectExample(id = "global.lex.status") {
+function createInspectExample(id = "global.echo.say") {
   return {
     operation: "inspect",
     target: { id },

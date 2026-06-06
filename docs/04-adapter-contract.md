@@ -111,9 +111,8 @@ Every adapter must answer:
 | Provider | Type adapter | Provider adapter | Why |
 |---|---|---|---|
 | `global.echo.say` | `internal` | none | smallest in-process capability |
-| `global.lex.status` | `cli` | none | sample CLI-backed read capability from the imported Lex family |
-| `global.lex.remember` | `cli` | none | sample CLI-backed write capability with visible `sideEffects: "write"` |
-| `global.majel.status` | `cli` | `majel` | sample provider-adapter capability with envelope normalization |
+| optional command family | `cli` | none | imported family routed through the generic CLI adapter |
+| provider-envelope fixture | `cli` | provider-specific | provider-adapter pattern with envelope normalization |
 
 The provider-adapter example under [`adapters/majel/index.js`](../adapters/majel/index.js)
 shows the envelope-translation pattern in its smallest useful form.

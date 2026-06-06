@@ -44,7 +44,7 @@ Current MCP scope:
 - `doctor`
 - `scout_check`
 
-Capabilities such as `global.lex.status` and `global.stfc-mod.status`
+Capabilities such as `global.echo.say`
 remain registry entries discovered through the single MCP tool `axf`.
 They are not separate MCP tools.
 

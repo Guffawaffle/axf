@@ -66,14 +66,16 @@ axf should prove:
   composes over the type adapter through the executor.
 - `axf init adapter --kind provider <name> [--composes <type>]` scaffolds
   a draft provider adapter.
-- Workspace-root resolution (`src/core/workspace.js`): explicit
-  `--workspace`, `AXF_WORKSPACE`, marker-file walk from cwd, marker walk
-  from script location, then cwd. Lets `axf` work from any directory.
+- Root resolution (`src/core/workspace.js`): canonical `--project-root`,
+  `--execution-root`, `AXF_PROJECT_ROOT`, and `AXF_EXECUTION_ROOT`, with
+  legacy `--workspace` / `AXF_WORKSPACE` compatibility aliases, then
+  marker-file walk from cwd, marker walk from script location, then cwd.
+  Lets `axf` work from any directory.
 - `axf` symlinked at `/usr/local/bin/axf` as the alpha PATH binary.
 - The provider adapter at `adapters/majel/` proves envelope
   normalization on top of the generic `cli` adapter.
-- Additional sample provider-backed capabilities and toolspace mounts
-  ship as end-to-end references.
+- Provider-backed capability fixtures stay in tests instead of shipping
+  host-specific manifests as built-ins.
 - Canonical adapter prompts (`prompts/adapter-{discovery,planning,scaffold,review}.prompt.md`)
   rewritten to reference the actual file contract and the shipped
   provider-adapter example.

@@ -15,7 +15,6 @@ import { evaluatePolicies } from "../src/core/policy.js";
 import { main } from "../src/cli/main.js";
 
 const REPO_ROOT = new URL("..", import.meta.url).pathname;
-const LEX_CLI_TARGET = "node_modules/@smartergpt/lex/dist/shared/cli/lex.js";
 
 async function bootstrap() {
   const root = await mkdtemp(path.join(os.tmpdir(), "axf-fam-"));
@@ -352,37 +351,16 @@ test("synthesized capability metadata does not make unknown policies inert", asy
   });
 });
 
-test("framework repo ships the standard Lex family pack", async () => {
+test("framework repo ships only the tiny core capability surface", async () => {
   const registry = await createRegistry({ rootDir: REPO_ROOT });
 
-  const expected = {
-    "global.lex.status": "read",
-    "global.lex.introspect": "read",
-    "global.lex.recall": "read",
-    "global.lex.search": "read",
-    "global.lex.policy-check": "read",
-    "global.lex.remember": "write",
-    "global.lex.log-frame": "write",
-    "global.lex.note": "write",
-  };
-
-  for (const [id, sideEffects] of Object.entries(expected)) {
-    const capability = registry.getCapability(id);
-    assert.ok(capability, `${id} should be present`);
-    assert.equal(capability.sideEffects, sideEffects);
-    assert.equal(capability.executionTarget.command, undefined);
-    assert.equal(capability.executionTarget.launcher?.command, "node");
-    assert.deepEqual(capability.executionTarget.target, {
-      path: LEX_CLI_TARGET,
-      relativeTo: "framework",
-    });
-  }
-
-  const search = registry.getCapability("global.lex.search");
-  assert.deepEqual(search.argsSchema.required, ["query"]);
+  assert.ok(registry.getCapability("global.echo.say"));
+  assert.equal(registry.getCapability("global.lex.status"), undefined);
+  assert.equal(registry.getCapability("global.majel.status"), undefined);
+  assert.equal(registry.families.length, 0);
 });
 
-test("external workspace can use framework Lex globals without copied manifests", async () => {
+test("external workspace can use framework built-ins without copied manifests", async () => {
   const root = await bootstrap();
   await writeFile(
     path.join(root, "manifests", "capabilities", "workspace.repo.echo.json"),
@@ -418,51 +396,17 @@ test("external workspace can use framework Lex globals without copied manifests"
   );
   const byId = new Map(listed.capabilities.map((cap) => [cap.id, cap]));
   assert.ok(byId.has("workspace.repo.echo"));
-  assert.equal(byId.get("global.lex.recall")?.sideEffects, "read");
-  assert.equal(byId.get("global.lex.remember")?.sideEffects, "write");
+  assert.equal(byId.get("global.echo.say")?.sideEffects, "none");
 
-  const recall = JSON.parse(
+  const echo = JSON.parse(
     await captureStdout(() =>
-      main(["--workspace", root, "inspect", "global.lex.recall", "--json"]),
+      main(["--workspace", root, "inspect", "global.echo.say", "--json"]),
     ),
   );
-  assert.equal(recall.capability.id, "global.lex.recall");
-  assert.equal(recall.capability.sideEffects, "read");
-  assert.equal(recall.adapter.provenance, "framework");
-  assert.equal(recall.launchPlan.requestedCommand, "node");
-  assert.notEqual(recall.launchPlan.commandSource, "path:missing");
-  assert.equal(recall.launchPlan.cwd, root);
-  assert.equal(recall.launchPlan.cwdSource, "workspace");
-  assert.equal(
-    recall.launchPlan.targetPath,
-    path.join(REPO_ROOT, LEX_CLI_TARGET),
-  );
-  assert.equal(recall.launchPlan.targetSource, "relative:framework");
-  assert.deepEqual(recall.launchPlan.argsPrefix.slice(-2), [
-    "recall",
-    "--json",
-  ]);
-
-  const remember = JSON.parse(
-    await captureStdout(() =>
-      main(["--workspace", root, "inspect", "global.lex.remember", "--json"]),
-    ),
-  );
-  assert.equal(remember.capability.id, "global.lex.remember");
-  assert.equal(remember.capability.sideEffects, "write");
-  assert.equal(remember.launchPlan.requestedCommand, "node");
-  assert.notEqual(remember.launchPlan.commandSource, "path:missing");
-  assert.equal(remember.launchPlan.cwd, root);
-  assert.equal(remember.launchPlan.cwdSource, "workspace");
-  assert.equal(
-    remember.launchPlan.targetPath,
-    path.join(REPO_ROOT, LEX_CLI_TARGET),
-  );
-  assert.equal(remember.launchPlan.targetSource, "relative:framework");
-  assert.deepEqual(remember.launchPlan.argsPrefix.slice(-2), [
-    "remember",
-    "--json",
-  ]);
+  assert.equal(echo.capability.id, "global.echo.say");
+  assert.equal(echo.capability.layer, "framework");
+  assert.equal(echo.capability.provenance, "framework");
+  assert.equal(echo.adapter.provenance, "framework");
 
   const workspaceRun = JSON.parse(
     await captureStdout(() =>
@@ -485,7 +429,7 @@ test("external workspace can use framework Lex globals without copied manifests"
   const doctor = JSON.parse(
     await captureStdout(() => main(["--workspace", root, "doctor", "--json"])),
   );
-  assert.equal(doctor.familyCount, 1);
+  assert.equal(doctor.familyCount, 0);
   assert.ok(
     doctor.adaptersByType.some(
       (adapter) => adapter.type === "cli" && adapter.provenance === "framework",
@@ -501,47 +445,203 @@ test("external workspace can use framework Lex globals without copied manifests"
   assert.equal(scout.changeCount, 0);
 });
 
-test("framework Lex note runs without depending on bare lex on PATH", async () => {
+test("machine-level family pack is discovered without being bundled", async () => {
   const root = await bootstrap();
-  const envWithoutLex = {
-    ...process.env,
-    PATH: path.dirname(process.execPath),
-  };
+  const machineRoot = await bootstrap();
+  await writeFamily(machineRoot, "shared", {
+    manifestVersion: "axf/v0",
+    family: "shared",
+    scope: "global",
+    provider: "shared",
+    adapterType: "cli",
+    executionTarget: { command: "shared" },
+    lifecycleState: "active",
+    commands: {
+      status: {
+        summary: "machine shared status",
+        executionTarget: { command: "shared", args: ["status"] },
+        args: {},
+        sideEffects: "read",
+      },
+    },
+  });
 
-  const result = JSON.parse(
-    await captureStdout(() =>
-      main(
-        [
-          "--workspace",
-          root,
-          "run",
-          "global.lex.note",
-          "--summary",
-          "AXF package-local Lex dry-run note",
-          "--modules",
-          "axf",
-          "--skip-policy",
-          "--dry-run",
-          "--json",
-        ],
-        { env: envWithoutLex },
-      ),
+  const registry = await createRegistry({ rootDir: root, machineRoot });
+  const status = registry.getCapability("global.shared.status");
+
+  assert.ok(status);
+  assert.equal(status.summary, "machine shared status");
+  assert.equal(status.layer, "machine");
+  assert.equal(status.sourceFamily.layer, "machine");
+  assert.equal(registry.families[0].layer, "machine");
+});
+
+test("project family shadows machine family with the same identity", async () => {
+  const root = await bootstrap();
+  const machineRoot = await bootstrap();
+  await writeFamily(machineRoot, "lex", {
+    manifestVersion: "axf/v0",
+    family: "lex",
+    scope: "global",
+    provider: "lex",
+    adapterType: "cli",
+    executionTarget: { command: "machine-lex" },
+    lifecycleState: "active",
+    commands: {
+      status: {
+        summary: "machine lex status",
+        executionTarget: { command: "machine-lex", args: ["status"] },
+        args: {},
+      },
+    },
+  });
+  await writeFamily(root, "lex", {
+    manifestVersion: "axf/v0",
+    family: "lex",
+    scope: "global",
+    provider: "lex",
+    adapterType: "cli",
+    executionTarget: { command: "project-lex" },
+    lifecycleState: "active",
+    commands: {
+      status: {
+        summary: "project lex status",
+        executionTarget: { command: "project-lex", args: ["status"] },
+        args: {},
+      },
+    },
+  });
+
+  const registry = await createRegistry({ rootDir: root, machineRoot });
+  const status = registry.getCapability("global.lex.status");
+
+  assert.equal(status.summary, "project lex status");
+  assert.equal(status.executionTarget.command, "project-lex");
+  assert.equal(status.layer, "project");
+  assert.equal(registry.families.length, 1);
+  assert.equal(registry.families[0].layer, "project");
+  assert.equal(registry.shadowedFamilies.length, 1);
+  assert.equal(registry.shadowedFamilies[0].layer, "machine");
+  assert.equal(registry.shadowedFamilies[0].shadowedBy.layer, "project");
+});
+
+test("project family can shadow framework built-in capability ids", async () => {
+  const root = await bootstrap();
+  await writeFamily(root, "echo", {
+    manifestVersion: "axf/v0",
+    family: "echo",
+    scope: "global",
+    provider: "echo",
+    adapterType: "cli",
+    lifecycleState: "active",
+    commands: {
+      say: {
+        summary: "project echo say",
+        executionTarget: { command: "project-echo", args: ["say"] },
+        args: { message: { type: "string" } },
+      },
+    },
+  });
+
+  const registry = await createRegistry({
+    rootDir: root,
+    enableFrameworkBuiltins: true,
+  });
+  const say = registry.getCapability("global.echo.say");
+
+  assert.equal(say.summary, "project echo say");
+  assert.equal(say.executionTarget.command, "project-echo");
+  assert.equal(say.layer, "project");
+  assert.equal(say.sourceFamily.layer, "project");
+});
+
+test("same-layer duplicate family identity is a conflict", async () => {
+  const root = await bootstrap();
+  await writeFamily(root, "lex-a", {
+    manifestVersion: "axf/v0",
+    family: "lex",
+    scope: "global",
+    provider: "lex",
+    adapterType: "cli",
+    lifecycleState: "active",
+    commands: {
+      status: { summary: "a", executionTarget: { command: "a" } },
+    },
+  });
+  await writeFamily(root, "lex-b", {
+    manifestVersion: "axf/v0",
+    family: "lex",
+    scope: "global",
+    provider: "lex",
+    adapterType: "cli",
+    lifecycleState: "active",
+    commands: {
+      status: { summary: "b", executionTarget: { command: "b" } },
+    },
+  });
+
+  const registry = await createRegistry({ rootDir: root });
+
+  assert.equal(registry.getCapability("global.lex.status"), undefined);
+  assert.equal(registry.familyConflicts.length, 1);
+  assert.ok(
+    registry.loadIssues.some((issue) => /family conflict/.test(issue.message)),
+  );
+});
+
+test("project materialized command overrides an effective machine family", async () => {
+  const root = await bootstrap();
+  const machineRoot = await bootstrap();
+  await writeFamily(machineRoot, "lex", {
+    manifestVersion: "axf/v0",
+    family: "lex",
+    scope: "global",
+    provider: "lex",
+    adapterType: "cli",
+    lifecycleState: "active",
+    commands: {
+      status: {
+        summary: "machine lex status",
+        executionTarget: { command: "machine-lex", args: ["status"] },
+        args: {},
+      },
+    },
+  });
+  await writeFile(
+    path.join(root, "manifests", "capabilities", "global.lex.status.json"),
+    JSON.stringify(
+      {
+        manifestVersion: "axf/v0",
+        id: "global.lex.status",
+        summary: "local lex status",
+        provider: "lex",
+        adapterType: "cli",
+        executionTarget: { command: "project-lex", args: ["status"] },
+        argsSchema: { type: "object", properties: {} },
+        outputModes: ["text"],
+        sideEffects: "read",
+        scope: "global",
+        lifecycleState: "active",
+        defaults: {},
+        policies: [],
+        owner: "test",
+        argMap: {},
+        sourceFamily: {
+          family: "lex",
+          command: "status",
+          manifestPath: "manifests/families/lex.family.json",
+        },
+      },
+      null,
+      2,
     ),
   );
 
-  assert.equal(result.ok, true);
-  assert.equal(result.data.code, "FRAME_VALID");
-  assert.equal(result.data.data.dryRun, true);
-  assert.equal(result.meta.launchPlan.requestedCommand, "node");
-  assert.notEqual(result.meta.launchPlan.commandSource, "path:missing");
-  assert.equal(
-    result.meta.launchPlan.targetPath,
-    path.join(REPO_ROOT, LEX_CLI_TARGET),
-  );
-  assert.equal(result.meta.launchPlan.targetSource, "relative:framework");
-  assert.deepEqual(result.meta.launchPlan.args.slice(0, 3), [
-    path.join(REPO_ROOT, LEX_CLI_TARGET),
-    "remember",
-    "--json",
-  ]);
+  const registry = await createRegistry({ rootDir: root, machineRoot });
+  const status = registry.getCapability("global.lex.status");
+
+  assert.equal(status.summary, "local lex status");
+  assert.equal(status.origin, "materialized");
+  assert.equal(status.layer, "project");
+  assert.equal(status.sourceFamily.layer, "machine");
 });

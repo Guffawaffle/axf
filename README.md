@@ -94,9 +94,10 @@ command arguments cleanly:
     "axf": {
       "command": "node",
       "args": ["/path/to/axf/bin/axf.js", "mcp"],
-      "cwd": "/path/to/workspace",
+      "cwd": "/path/to/project",
       "env": {
-        "AXF_WORKSPACE": "/path/to/workspace"
+        "AXF_PROJECT_ROOT": "/path/to/project",
+        "AXF_EXECUTION_ROOT": "/path/to/project"
       }
     }
   }
@@ -111,9 +112,10 @@ Direct-bin configs remain valid:
     "axf": {
       "command": "node",
       "args": ["/path/to/axf/bin/axf-mcp.js"],
-      "cwd": "/path/to/workspace",
+      "cwd": "/path/to/project",
       "env": {
-        "AXF_WORKSPACE": "/path/to/workspace"
+        "AXF_PROJECT_ROOT": "/path/to/project",
+        "AXF_EXECUTION_ROOT": "/path/to/project"
       }
     }
   }
@@ -152,9 +154,10 @@ launcher with `mcp` as an argument:
     "axf": {
       "command": "axf.cmd",
       "args": ["mcp"],
-      "cwd": "C:\\src\\my-workspace",
+      "cwd": "C:\\src\\my-project",
       "env": {
-        "AXF_WORKSPACE": "C:\\src\\my-workspace"
+        "AXF_PROJECT_ROOT": "C:\\src\\my-project",
+        "AXF_EXECUTION_ROOT": "C:\\src\\my-project"
       }
     }
   }
@@ -169,9 +172,10 @@ Direct-bin `.cmd` configs are still valid:
     "axf": {
       "command": "axf-mcp.cmd",
       "args": [],
-      "cwd": "C:\\src\\my-workspace",
+      "cwd": "C:\\src\\my-project",
       "env": {
-        "AXF_WORKSPACE": "C:\\src\\my-workspace"
+        "AXF_PROJECT_ROOT": "C:\\src\\my-project",
+        "AXF_EXECUTION_ROOT": "C:\\src\\my-project"
       }
     }
   }
@@ -189,9 +193,10 @@ with `mcp` as the first argument:
     "axf": {
       "command": "axf",
       "args": ["mcp"],
-      "cwd": "/home/user/src/my-workspace",
+      "cwd": "/home/user/src/my-project",
       "env": {
-        "AXF_WORKSPACE": "/home/user/src/my-workspace"
+        "AXF_PROJECT_ROOT": "/home/user/src/my-project",
+        "AXF_EXECUTION_ROOT": "/home/user/src/my-project"
       }
     }
   }
@@ -206,9 +211,10 @@ Direct-bin configs remain valid:
     "axf": {
       "command": "axf-mcp",
       "args": [],
-      "cwd": "/home/user/src/my-workspace",
+      "cwd": "/home/user/src/my-project",
       "env": {
-        "AXF_WORKSPACE": "/home/user/src/my-workspace"
+        "AXF_PROJECT_ROOT": "/home/user/src/my-project",
+        "AXF_EXECUTION_ROOT": "/home/user/src/my-project"
       }
     }
   }
@@ -216,27 +222,34 @@ Direct-bin configs remain valid:
 ```
 
 WSL users should use a native WSL AXF install on `PATH`, not Windows npm
-shims or npm's `_npx` cache. AXF's `global.lex.*` capabilities launch
-the package-local Lex dependency, but direct Lex usage should follow the
-same native WSL rule. See
-[WSL Native Lex Install](https://github.com/Guffawaffle/lex/blob/HEAD/docs/WSL_NATIVE_INSTALL.md)
-for the recommended user-local install, checkout symlink bridge, and
-native SQLite build requirements.
+shims or npm's `_npx` cache. Optional shared packs that launch native
+CLIs should follow the same rule: prefer Linux-native tools earlier on
+PATH and avoid crossing into Windows shims from WSL.
 
-### Workspace binding
+### Root binding
 
-`axf`, `axf mcp`, and `axf-mcp` find the active workspace in this order:
+`axf`, `axf mcp`, and `axf-mcp` resolve the active project root and
+execution root in this order:
 
-1. explicit `--workspace`
-2. `AXF_WORKSPACE`
-3. nearest `axf.workspace.json` from `cwd`
-4. nearest `axf.workspace.json` from the installed script location
-5. `cwd` fallback
+1. explicit `--project-root` and `--execution-root`
+2. `AXF_PROJECT_ROOT` and `AXF_EXECUTION_ROOT`
+3. legacy aliases: `--workspace`, `--registry-workspace`, `--execution-workspace`, `AXF_WORKSPACE`, `AXF_REGISTRY_WORKSPACE`, `AXF_EXECUTION_WORKSPACE`
+4. nearest `axf.workspace.json` from `cwd`
+5. nearest `axf.workspace.json` from the installed script location
+6. `cwd` fallback
 
-For MCP clients, set both `cwd` and `AXF_WORKSPACE` to the intended
-workspace when possible. That makes the exposed command surface
-deterministic and keeps workspace-relative execution targets anchored to
-the right repo.
+When discovery and execution should use the same repo, set both
+`AXF_PROJECT_ROOT` and `AXF_EXECUTION_ROOT` to the same path. When they
+should differ, set them independently. Legacy `AXF_WORKSPACE` remains a
+compatibility alias that binds both roots to one path.
+
+For MCP clients, set `cwd` to the intended caller execution directory and
+set `AXF_PROJECT_ROOT` / `AXF_EXECUTION_ROOT` explicitly when possible.
+That keeps manifest discovery and caller-facing execution deterministic.
+
+Set `AXF_MACHINE_ROOT` when you want a user- or machine-scoped AXF root
+to contribute optional shared packs across projects. Project-root
+families shadow machine-level families with the same family name.
 
 From any directory once installed:
 
@@ -274,7 +287,7 @@ authoritative mutation and control plane for commands such as `init`,
 `promote`, `demote`, `scout --write`, and other registry/materialization
 flows.
 
-Capabilities such as `global.lex.status` and `global.echo.say` are not
+Capabilities such as `global.echo.say` are not
 separate MCP tools. Use `operation=help` to learn the router contract,
 `operation=list` to discover capabilities, and `operation=inspect`
 before `operation=run`. Treat capability
@@ -293,8 +306,8 @@ without restarting the server.
 Full CLI parity may be considered later behind explicit policy and
 approval gates.
 
-Lex appears through AXF only when the bound AXF workspace discovers or
-mounts Lex capabilities such as `global.lex.*` or `toolspace.ops.lex.*`.
+Shared packs appear through AXF only when the bound AXF project root or
+machine layer discovers or mounts those capabilities.
 
 ## What's wired up
 
@@ -306,46 +319,36 @@ AXF ships two public built-in adapter types:
 - **`cli`** — generic subprocess dispatcher with stdout JSON parsing
   (`adapters/cli/`)
 
-The standard Lex capability family uses the generic `cli` adapter. It
-does not require a dedicated Lex adapter. AXF depends on
-`@smartergpt/lex` at runtime and launches the package-local Lex CLI
-through Node, so `global.lex.*` does not depend on an ambient `lex`
-shim on PATH.
+Shared command families use the same adapter contract as project-owned
+capabilities. A shared pack can use the generic `cli` adapter, a
+provider adapter, or an internal handler, but AXF core does not require
+that pack as a runtime dependency.
 
 ### Built-in capabilities
 
 | Capability | Provider | Lifecycle | Notes |
 |---|---|---|---|
 | `global.echo.say` | internal | active | smallest in-process capability example |
-| `global.lex.status` | Lex via cli | active | compact Lex state and health summary |
-| `global.lex.recall` | Lex via cli | active | recall frames by query or list recent frames |
-| `global.lex.search` | Lex via cli | active | search Lex frames by query |
-| `global.lex.policy-check` | Lex via cli | active | validate Lex policy files and optional module mapping |
-| `global.lex.remember` | Lex via cli | active | write-classified capture of a work-session frame |
-| `global.lex.log-frame` | Lex via cli | active | write-classified alias for frame logging |
-| `global.lex.note` | Lex via cli | active | write-classified alias for repo notes |
 
-Lex is a reference capability family routed by AXF. It demonstrates how
-workspace-native memory and policy capabilities can sit behind AXF's
-resolver, lifecycle, policy, adapter, and executor path without defining
-the framework itself.
+Optional shared packs, including a Lex pack, can be added at machine or
+project scope. They route through the same resolver, lifecycle, policy,
+adapter, and executor path without defining the framework itself.
 
 ### Toolspaces
 
 - **`toy`** — smallest mount example; re-mounts `echo.say` with a local default
-- **`ops`** — multi-capability mount example for grouped launch surfaces, including the reusable read-only Lex pack
 
 ## Repo onboarding
 
 The recommended repo flow is:
 
 1. Add `axf.workspace.json` at the repo root so workspace binding is explicit.
-2. Reuse the imported `global.lex.*` family or mount the read-only Lex pack into a toolspace.
+2. Add shared packs intentionally at machine or project scope when a repo wants them.
 3. Add repo-specific capabilities separately under `manifests/capabilities/` or `manifests/families/`.
 4. Keep MCP optional; AXF works as a plain CLI capability router without it.
 5. Mark mutating capabilities with `sideEffects: "write"`. AXF does not yet have a first-class `approvalRequired` field, so approval gates stay a repo policy or review convention for now.
 
-See [`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md) for a concrete pattern including Lex mounts and WSL/Windows notes.
+See [`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md) for the concrete onboarding pattern and platform notes.
 
 ## How to add a new provider
 
@@ -412,7 +415,9 @@ test/                           # node:test suite
 13. [`docs/12-layered-docs.md`](docs/12-layered-docs.md) — caller /
     integrator / author paths through the docs
 14. [`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md) —
-  workspace markers, standard Lex capabilities, and platform guidance
+  workspace markers, shared packs, and platform guidance
+15. [`docs/14-family-identity-and-layer-precedence-plan.md`](docs/14-family-identity-and-layer-precedence-plan.md) —
+  family identity, layer precedence, and optional shared-pack direction
 
 ## Tests
 

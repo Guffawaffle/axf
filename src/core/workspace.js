@@ -46,7 +46,11 @@ export function findWorkspaceRoot(opts = {}) {
 export function findExecutionWorkspaceRoot(opts = {}) {
   return resolveWorkspaceRoot({
     ...opts,
-    envNames: [EXECUTION_ROOT_ENV, EXECUTION_WORKSPACE_ENV, LEGACY_WORKSPACE_ENV],
+    envNames: [
+      EXECUTION_ROOT_ENV,
+      EXECUTION_WORKSPACE_ENV,
+      LEGACY_WORKSPACE_ENV,
+    ],
     includeScriptFallback: false,
   });
 }

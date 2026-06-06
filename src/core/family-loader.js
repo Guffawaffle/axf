@@ -231,9 +231,11 @@ export function synthesizeFamilyCapabilities(
         family: family.family,
         command: cmdKey,
         manifestPath: family.manifestPath,
+        layer: family.layer,
       },
       manifestPath: family.manifestPath,
       origin,
+      layer: family.layer,
       provenance: family.provenance,
     };
     copyDescriptiveMetadata(capability, cmd);
