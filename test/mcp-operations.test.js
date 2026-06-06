@@ -237,6 +237,45 @@ test("axf run rejects unknown capability", async () => {
   assert.match(result.error.message, /inspect/);
 });
 
+test("axf inspect suggests runnable capabilities for capability prefixes", async () => {
+  const result = await performOperation({
+    operation: "inspect",
+    workspace: repoRoot,
+    target: { id: "global.lex" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.operation, "inspect");
+  assert.equal(result.error.code, "UNKNOWN_CAPABILITY");
+  assert.equal(result.error.reason, "capability_prefix");
+  assert.equal(result.error.prefix, "global.lex");
+  assert.ok(
+    result.error.suggestions.some(
+      (suggestion) => suggestion.id === "global.lex.status",
+    ),
+  );
+  assert.match(result.error.message, /not a runnable capability/);
+});
+
+test("axf run suggests runnable capabilities for capability prefixes", async () => {
+  const result = await performOperation({
+    operation: "run",
+    workspace: repoRoot,
+    target: { id: "global.lex" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.operation, "run");
+  assert.equal(result.error.code, "UNKNOWN_CAPABILITY");
+  assert.equal(result.error.reason, "capability_prefix");
+  assert.ok(
+    result.error.suggestions.some(
+      (suggestion) => suggestion.id === "global.lex.status",
+    ),
+  );
+  assert.equal(result.error.inspectExample.operation, "inspect");
+});
+
 test("axf run missing target returns inspect guidance", async () => {
   const result = await performOperation({
     operation: "run",

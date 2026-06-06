@@ -1,12 +1,12 @@
 {
   "name": "@smartergpt/axf",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "type": "module",
   "description": "Agent eXoskeleton Framework control plane for workspace-native agent capabilities.",
   "bin": {
-    "axf": "./bin/axf.js",
-    "axf-mcp": "./bin/axf-mcp.js"
+    "axf": "bin/axf.js",
+    "axf-mcp": "bin/axf-mcp.js"
   },
   "files": [
     "bin/",

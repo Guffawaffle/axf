@@ -1,7 +1,7 @@
 import { readFile, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { AxError } from "./errors.js";
+import { AxError, UnknownCapabilityError } from "./errors.js";
 import { parseCapabilityInput } from "./path-model.js";
 import { synthesizeMountedCapability } from "./resolver.js";
 import {
@@ -239,7 +239,7 @@ export class ManifestRegistry {
       const capability =
         this.capabilities.get(parsed.id) ?? this.findMountedById(parsed.id);
       if (!capability) {
-        throw new AxError(`unknown capability '${parsed.id}'`, 2);
+        throw this.unknownCapabilityError(parsed.id);
       }
       return {
         input: parsed,
@@ -268,7 +268,7 @@ export class ManifestRegistry {
           injectedDefaults: wsCapability.defaults ?? {},
         };
       }
-      throw new AxError(`unknown capability '${id}' (also tried '${wsId}')`, 2);
+      throw this.unknownCapabilityError(id, { alsoTried: [wsId] });
     }
 
     const toolspace = this.toolspaces.get(parsed.toolspace);
@@ -308,6 +308,61 @@ export class ManifestRegistry {
     return this.listMountedCapabilities().find(
       (capability) => capability.id === id,
     );
+  }
+
+  unknownCapabilityError(requestedId, { alsoTried = [] } = {}) {
+    const suggestions = this.findCapabilitiesByPrefix(requestedId);
+    const triedText =
+      alsoTried.length > 0 ? ` (also tried '${alsoTried.join("', '")}')` : "";
+
+    if (suggestions.length === 0) {
+      return new UnknownCapabilityError(
+        `unknown capability '${requestedId}'${triedText}`,
+        {
+          requestedId,
+          alsoTried,
+          suggestions: [],
+        },
+      );
+    }
+
+    const suggestionIds = suggestions.map((capability) => capability.id);
+    const suggestionText = suggestionIds.join(", ");
+    return new UnknownCapabilityError(
+      `unknown capability '${requestedId}'${triedText}; '${requestedId}' is a capability prefix, not a runnable capability. Available capabilities: ${suggestionText}`,
+      {
+        requestedId,
+        alsoTried,
+        prefix: requestedId,
+        reason: "capability_prefix",
+        suggestions: suggestions.map((capability) => ({
+          id: capability.id,
+          summary: capability.summary,
+          lifecycleState: capability.lifecycleState,
+          sideEffects: capability.sideEffects,
+        })),
+        nextSteps: [
+          {
+            action: "inspect_capability",
+            description: "Inspect one of the suggested runnable capability ids.",
+            example: suggestionIds[0],
+          },
+          {
+            action: "run_capability",
+            description:
+              "Run one of the suggested capability ids after inspection.",
+            example: suggestionIds[0],
+          },
+        ],
+      },
+    );
+  }
+
+  findCapabilitiesByPrefix(prefix) {
+    const prefixWithDot = `${prefix}.`;
+    return [...this.capabilities.values(), ...this.listMountedCapabilities()]
+      .filter((capability) => capability.id.startsWith(prefixWithDot))
+      .sort((left, right) => left.id.localeCompare(right.id));
   }
 }
 
