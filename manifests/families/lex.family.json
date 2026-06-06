@@ -13,7 +13,13 @@
     "status": {
       "summary": "Compact Lex state and health summary",
       "executionTarget": {
-        "command": "lex",
+        "target": {
+          "path": "node_modules/@smartergpt/lex/dist/shared/cli/lex.js",
+          "relativeTo": "framework"
+        },
+        "launcher": {
+          "command": "node"
+        },
         "args": ["introspect", "--json", "--format", "compact"]
       },
       "args": {},
@@ -22,7 +28,13 @@
     "introspect": {
       "summary": "Full Lex introspection output",
       "executionTarget": {
-        "command": "lex",
+        "target": {
+          "path": "node_modules/@smartergpt/lex/dist/shared/cli/lex.js",
+          "relativeTo": "framework"
+        },
+        "launcher": {
+          "command": "node"
+        },
         "args": ["introspect", "--json"]
       },
       "args": {
@@ -33,11 +45,20 @@
     "recall": {
       "summary": "Recall frames by query or list recent frames",
       "executionTarget": {
-        "command": "lex",
+        "target": {
+          "path": "node_modules/@smartergpt/lex/dist/shared/cli/lex.js",
+          "relativeTo": "framework"
+        },
+        "launcher": {
+          "command": "node"
+        },
         "args": ["recall", "--json"]
       },
       "args": {
-        "query": { "type": "string", "description": "Search query or reference point" },
+        "query": {
+          "type": "string",
+          "description": "Search query or reference point"
+        },
         "list": { "type": "integer", "description": "List recent frames" },
         "exact": { "type": "boolean" },
         "mode": { "type": "string" },
@@ -53,11 +74,21 @@
     "search": {
       "summary": "Search Lex frames by query",
       "executionTarget": {
-        "command": "lex",
+        "target": {
+          "path": "node_modules/@smartergpt/lex/dist/shared/cli/lex.js",
+          "relativeTo": "framework"
+        },
+        "launcher": {
+          "command": "node"
+        },
         "args": ["recall", "--json"]
       },
       "args": {
-        "query": { "type": "string", "required": true, "description": "Search query" },
+        "query": {
+          "type": "string",
+          "required": true,
+          "description": "Search query"
+        },
         "exact": { "type": "boolean" },
         "mode": { "type": "string" },
         "fold-radius": { "type": "integer" },
@@ -72,7 +103,13 @@
     "policy-check": {
       "summary": "Validate Lex policy files and optional module mapping",
       "executionTarget": {
-        "command": "lex",
+        "target": {
+          "path": "node_modules/@smartergpt/lex/dist/shared/cli/lex.js",
+          "relativeTo": "framework"
+        },
+        "launcher": {
+          "command": "node"
+        },
         "args": ["policy", "check", "--json"]
       },
       "args": {
@@ -85,7 +122,13 @@
     "remember": {
       "summary": "Capture a work-session frame in Lex",
       "executionTarget": {
-        "command": "lex",
+        "target": {
+          "path": "node_modules/@smartergpt/lex/dist/shared/cli/lex.js",
+          "relativeTo": "framework"
+        },
+        "launcher": {
+          "command": "node"
+        },
         "args": ["remember", "--json"]
       },
       "args": {
@@ -110,7 +153,13 @@
     "log-frame": {
       "summary": "Alias of lex remember for frame logging",
       "executionTarget": {
-        "command": "lex",
+        "target": {
+          "path": "node_modules/@smartergpt/lex/dist/shared/cli/lex.js",
+          "relativeTo": "framework"
+        },
+        "launcher": {
+          "command": "node"
+        },
         "args": ["remember", "--json"]
       },
       "args": {
@@ -135,7 +184,13 @@
     "note": {
       "summary": "Alias of lex remember for repo notes",
       "executionTarget": {
-        "command": "lex",
+        "target": {
+          "path": "node_modules/@smartergpt/lex/dist/shared/cli/lex.js",
+          "relativeTo": "framework"
+        },
+        "launcher": {
+          "command": "node"
+        },
         "args": ["remember", "--json"]
       },
       "args": {

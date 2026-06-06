@@ -14,6 +14,9 @@ import {
 import { evaluatePolicies } from "../src/core/policy.js";
 import { main } from "../src/cli/main.js";
 
+const REPO_ROOT = new URL("..", import.meta.url).pathname;
+const LEX_CLI_TARGET = "node_modules/@smartergpt/lex/dist/shared/cli/lex.js";
+
 async function bootstrap() {
   const root = await mkdtemp(path.join(os.tmpdir(), "axf-fam-"));
   await mkdir(path.join(root, "manifests", "capabilities"), {
@@ -350,8 +353,7 @@ test("synthesized capability metadata does not make unknown policies inert", asy
 });
 
 test("framework repo ships the standard Lex family pack", async () => {
-  const root = new URL("..", import.meta.url).pathname;
-  const registry = await createRegistry({ rootDir: root });
+  const registry = await createRegistry({ rootDir: REPO_ROOT });
 
   const expected = {
     "global.lex.status": "read",
@@ -368,6 +370,12 @@ test("framework repo ships the standard Lex family pack", async () => {
     const capability = registry.getCapability(id);
     assert.ok(capability, `${id} should be present`);
     assert.equal(capability.sideEffects, sideEffects);
+    assert.equal(capability.executionTarget.command, undefined);
+    assert.equal(capability.executionTarget.launcher?.command, "node");
+    assert.deepEqual(capability.executionTarget.target, {
+      path: LEX_CLI_TARGET,
+      relativeTo: "framework",
+    });
   }
 
   const search = registry.getCapability("global.lex.search");
@@ -421,8 +429,19 @@ test("external workspace can use framework Lex globals without copied manifests"
   assert.equal(recall.capability.id, "global.lex.recall");
   assert.equal(recall.capability.sideEffects, "read");
   assert.equal(recall.adapter.provenance, "framework");
+  assert.equal(recall.launchPlan.requestedCommand, "node");
+  assert.notEqual(recall.launchPlan.commandSource, "path:missing");
   assert.equal(recall.launchPlan.cwd, root);
   assert.equal(recall.launchPlan.cwdSource, "workspace");
+  assert.equal(
+    recall.launchPlan.targetPath,
+    path.join(REPO_ROOT, LEX_CLI_TARGET),
+  );
+  assert.equal(recall.launchPlan.targetSource, "relative:framework");
+  assert.deepEqual(recall.launchPlan.argsPrefix.slice(-2), [
+    "recall",
+    "--json",
+  ]);
 
   const remember = JSON.parse(
     await captureStdout(() =>
@@ -431,8 +450,19 @@ test("external workspace can use framework Lex globals without copied manifests"
   );
   assert.equal(remember.capability.id, "global.lex.remember");
   assert.equal(remember.capability.sideEffects, "write");
+  assert.equal(remember.launchPlan.requestedCommand, "node");
+  assert.notEqual(remember.launchPlan.commandSource, "path:missing");
   assert.equal(remember.launchPlan.cwd, root);
   assert.equal(remember.launchPlan.cwdSource, "workspace");
+  assert.equal(
+    remember.launchPlan.targetPath,
+    path.join(REPO_ROOT, LEX_CLI_TARGET),
+  );
+  assert.equal(remember.launchPlan.targetSource, "relative:framework");
+  assert.deepEqual(remember.launchPlan.argsPrefix.slice(-2), [
+    "remember",
+    "--json",
+  ]);
 
   const workspaceRun = JSON.parse(
     await captureStdout(() =>
@@ -469,4 +499,49 @@ test("external workspace can use framework Lex globals without copied manifests"
   );
   assert.equal(scout.ok, true);
   assert.equal(scout.changeCount, 0);
+});
+
+test("framework Lex note runs without depending on bare lex on PATH", async () => {
+  const root = await bootstrap();
+  const envWithoutLex = {
+    ...process.env,
+    PATH: path.dirname(process.execPath),
+  };
+
+  const result = JSON.parse(
+    await captureStdout(() =>
+      main(
+        [
+          "--workspace",
+          root,
+          "run",
+          "global.lex.note",
+          "--summary",
+          "AXF package-local Lex dry-run note",
+          "--modules",
+          "axf",
+          "--skip-policy",
+          "--dry-run",
+          "--json",
+        ],
+        { env: envWithoutLex },
+      ),
+    ),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.data.code, "FRAME_VALID");
+  assert.equal(result.data.data.dryRun, true);
+  assert.equal(result.meta.launchPlan.requestedCommand, "node");
+  assert.notEqual(result.meta.launchPlan.commandSource, "path:missing");
+  assert.equal(
+    result.meta.launchPlan.targetPath,
+    path.join(REPO_ROOT, LEX_CLI_TARGET),
+  );
+  assert.equal(result.meta.launchPlan.targetSource, "relative:framework");
+  assert.deepEqual(result.meta.launchPlan.args.slice(0, 3), [
+    path.join(REPO_ROOT, LEX_CLI_TARGET),
+    "remember",
+    "--json",
+  ]);
 });

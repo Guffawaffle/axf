@@ -29,8 +29,11 @@ The command is a literal program name on PATH. No target file.
 ```
 
 `relativeTo: "workspace"` joins the path under the resolved workspace
-root at runtime. The cli adapter uses the resolved absolute path as the
-command argument.
+root at runtime. `relativeTo: "framework"` joins the path under the AXF
+package root, which is useful for framework-owned capabilities that
+must launch bundled runtime dependencies without relying on global
+shims. The cli adapter uses the resolved absolute path as the command
+argument.
 
 ### Env-bound root with a fallback
 
@@ -106,7 +109,7 @@ capability:
     "cwd": "/abs/workspace",
     "cwdSource": "workspace",
     "targetPath": "/abs/scripts/build.ps1",
-    "targetSource": "workspace"
+    "targetSource": "relative:workspace"
   }
 }
 ```
@@ -117,9 +120,9 @@ resolver via `src/core/cli-launch-plan.js`.
 ## Windows npm shims
 
 On Windows, npm-installed CLIs often resolve to `.cmd` or `.bat` shims
-rather than native executables. AXF now keeps the manifest contract the
-same (`"command": "lex"`) and resolves the platform detail at launch
-time:
+rather than native executables. For workspace-owned capabilities that
+intentionally use a PATH command, AXF keeps the manifest contract simple
+and resolves the platform detail at launch time:
 
 - direct executables continue to run directly
 - resolved `.cmd` / `.bat` shims are launched explicitly through
@@ -129,6 +132,12 @@ time:
 
 This keeps repo manifests portable and avoids per-repo PowerShell
 wrapper scripts for standard npm-installed tools.
+
+The framework-owned `global.lex.*` family does not use this PATH-based
+shape. It launches `node` with a `target.relativeTo: "framework"` path
+to AXF's package-local `@smartergpt/lex` dependency, so framework-global
+Lex capabilities remain executable even when no global `lex` shim is on
+PATH.
 
 ## WSL diagnostics
 

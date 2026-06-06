@@ -6,6 +6,7 @@ import path from "node:path";
 import { performOperation } from "../src/mcp/operations.js";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
+const LEX_CLI_TARGET = "node_modules/@smartergpt/lex/dist/shared/cli/lex.js";
 
 test("axf help explains the single-tool router contract", async () => {
   const result = await performOperation({
@@ -117,6 +118,57 @@ test("axf inspect preserves synthesized warnings/details in MCP responses", asyn
     "Inspect before reading native logs",
   ]);
   assert.deepEqual(result.capability.details, { logPath: "logs/demo.log" });
+});
+
+test("axf MCP inspect shows package-local framework Lex launch plan", async () => {
+  const result = await performOperation({
+    operation: "inspect",
+    workspace: repoRoot,
+    target: { id: "global.lex.note" },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.capability.id, "global.lex.note");
+  assert.equal(result.launchPlan.requestedCommand, "node");
+  assert.notEqual(result.launchPlan.commandSource, "path:missing");
+  assert.equal(
+    result.launchPlan.targetPath,
+    path.join(repoRoot, LEX_CLI_TARGET),
+  );
+  assert.equal(result.launchPlan.targetSource, "relative:framework");
+});
+
+test("axf MCP run executes framework Lex note without bare lex on PATH", async () => {
+  const result = await performOperation(
+    {
+      operation: "run",
+      workspace: repoRoot,
+      target: { id: "global.lex.note" },
+      args: {
+        summary: "AXF MCP package-local Lex dry-run note",
+        modules: "axf",
+        "skip-policy": true,
+        "dry-run": true,
+      },
+    },
+    {
+      env: {
+        ...process.env,
+        PATH: path.dirname(process.execPath),
+      },
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.data.code, "FRAME_VALID");
+  assert.equal(result.data.data.dryRun, true);
+  assert.equal(result.meta.launchPlan.requestedCommand, "node");
+  assert.notEqual(result.meta.launchPlan.commandSource, "path:missing");
+  assert.equal(
+    result.meta.launchPlan.targetPath,
+    path.join(repoRoot, LEX_CLI_TARGET),
+  );
+  assert.equal(result.meta.launchPlan.targetSource, "relative:framework");
 });
 
 test("axf run succeeds for a harmless known AXF capability", async () => {

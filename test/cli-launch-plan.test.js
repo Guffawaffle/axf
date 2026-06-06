@@ -10,8 +10,95 @@ import { executeResolvedCapability } from "../src/core/executor.js";
 import { loadAdapters } from "../src/core/adapter-loader.js";
 import { main } from "../src/cli/main.js";
 import { prepareCommandInvocation } from "../src/core/command-invocation.js";
+import { resolveCliLaunchPlan } from "../src/core/cli-launch-plan.js";
 
 const frameworkRoot = fileURLToPath(new URL("..", import.meta.url));
+const LEX_CLI_TARGET = "node_modules/@smartergpt/lex/dist/shared/cli/lex.js";
+
+test("cli adapter resolves a framework-relative target through a declared launcher", async () => {
+  const framework = await mkdtemp(path.join(os.tmpdir(), "ax-cli-framework-"));
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "ax-cli-workspace-"));
+  try {
+    await mkdir(path.join(framework, "tools"), { recursive: true });
+    await writeFile(
+      path.join(framework, "tools", "tool.mjs"),
+      `console.log(JSON.stringify({ argv: process.argv.slice(2) }));\n`,
+    );
+
+    const launchPlan = resolveCliLaunchPlan(
+      {
+        id: "global.demo.framework",
+        executionTarget: {
+          launcher: { command: process.execPath },
+          target: {
+            path: "tools/tool.mjs",
+            relativeTo: "framework",
+          },
+          args: ["seed"],
+        },
+      },
+      {
+        frameworkRoot: framework,
+        runtime: {
+          workspace: { root: workspace, viaMarker: true, source: "explicit" },
+        },
+      },
+    );
+
+    assert.equal(launchPlan.command, process.execPath);
+    assert.deepEqual(launchPlan.argsPrefix, [
+      path.join(framework, "tools", "tool.mjs"),
+      "seed",
+    ]);
+    assert.equal(launchPlan.cwd, workspace);
+    assert.equal(launchPlan.cwdSource, "workspace");
+    assert.equal(
+      launchPlan.targetPath,
+      path.join(framework, "tools", "tool.mjs"),
+    );
+    assert.equal(launchPlan.targetSource, "relative:framework");
+  } finally {
+    await rm(framework, { recursive: true, force: true });
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("cli adapter resolves hoisted framework dependency targets", async () => {
+  const framework = await mkdtemp(path.join(os.tmpdir(), "ax-cli-framework-"));
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "ax-cli-workspace-"));
+  try {
+    const launchPlan = resolveCliLaunchPlan(
+      {
+        id: "global.lex.note",
+        executionTarget: {
+          launcher: { command: process.execPath },
+          target: {
+            path: LEX_CLI_TARGET,
+            relativeTo: "framework",
+          },
+          args: ["remember", "--json"],
+        },
+      },
+      {
+        frameworkRoot: framework,
+        runtime: {
+          workspace: { root: workspace, viaMarker: true, source: "explicit" },
+        },
+      },
+    );
+
+    assert.equal(launchPlan.targetSource, "package:@smartergpt/lex");
+    assert.equal(launchPlan.argsPrefix[0], launchPlan.targetPath);
+    assert.equal(path.basename(launchPlan.targetPath), "lex.js");
+    assert.match(
+      launchPlan.targetPath,
+      /node_modules[/\\]@smartergpt[/\\]lex[/\\]dist[/\\]shared[/\\]cli[/\\]lex\.js$/,
+    );
+  } finally {
+    await rm(framework, { recursive: true, force: true });
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
 
 test("cli adapter resolves a workspace-relative target through a declared launcher", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));

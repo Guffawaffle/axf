@@ -126,8 +126,8 @@ Published-package smoke tests must run from a clean directory such as
 binary instead of the package-installed one.
 
 The registry-friendly launch shape is `axf mcp`, but the direct MCP bin
-remains valid for manual configurations. These equivalent forms were
-validated locally with the packed tarball:
+remains valid for manual configurations. These equivalent package-driven
+forms use the published npm package:
 
 ```sh
 npx -y --package @smartergpt/axf axf doctor
@@ -213,6 +213,14 @@ Direct-bin configs remain valid:
 }
 ```
 
+WSL users should use a native WSL AXF install on `PATH`, not Windows npm
+shims or npm's `_npx` cache. AXF's `global.lex.*` capabilities launch
+the package-local Lex dependency, but direct Lex usage should follow the
+same native WSL rule. See
+[WSL Native Lex Install](https://github.com/Guffawaffle/lex/blob/HEAD/docs/WSL_NATIVE_INSTALL.md)
+for the recommended user-local install, checkout symlink bridge, and
+native SQLite build requirements.
+
 ### Workspace binding
 
 `axf`, `axf mcp`, and `axf-mcp` find the active workspace in this order:
@@ -297,7 +305,10 @@ AXF ships two public built-in adapter types:
   (`adapters/cli/`)
 
 The standard Lex capability family uses the generic `cli` adapter. It
-does not require a dedicated Lex adapter.
+does not require a dedicated Lex adapter. AXF depends on
+`@smartergpt/lex` at runtime and launches the package-local Lex CLI
+through Node, so `global.lex.*` does not depend on an ambient `lex`
+shim on PATH.
 
 ### Built-in capabilities
 
@@ -362,7 +373,7 @@ error, or argument normalization beyond the generic route.
 
 ```
 axf.workspace.json               # workspace marker
-bin/axf.js                      # CLI entry (symlinked as /usr/local/bin/axf)
+bin/axf.js                      # CLI entrypoint
 src/cli/                        # CLI parsing + main dispatch
 src/core/                       # registry, resolver, executor, adapters, doctor, policy
 adapters/<type>/                # type adapters (internal, cli, ...)
@@ -371,7 +382,7 @@ manifests/capabilities/         # capability manifests
 manifests/toolspaces/           # toolspace mount manifests
 prompts/                        # canonical prompts for agent-authored adapters
 docs/                           # architecture, contract, lifecycle, prompts
-test/                           # node:test, zero-dep
+test/                           # node:test suite
 ```
 
 ## Reading order
@@ -407,7 +418,7 @@ test/                           # node:test, zero-dep
 npm test
 ```
 
-Zero dependencies. Uses Node's built-in `node:test`.
+Uses Node's built-in `node:test`; no external test runner is required.
 
 ## What is intentionally **not** here
 

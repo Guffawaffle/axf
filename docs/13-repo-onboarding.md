@@ -25,7 +25,10 @@ workspace, and `axf doctor` will say so explicitly.
 ## 2. Reuse the standard Lex family
 
 AXF ships an imported `global.lex.*` family so repos can reuse the same
-Lex command surface without local wrapper manifests.
+Lex command surface without local wrapper manifests. The framework Lex
+family launches AXF's package-local `@smartergpt/lex` dependency through
+Node, so these capabilities do not require a global `lex` command on
+PATH.
 
 Read-oriented capabilities:
 
@@ -94,14 +97,16 @@ Current recommendation:
 
 ### Windows
 
-Use standard PATH-based commands such as `"command": "lex"` in
-manifests. AXF resolves npm `.cmd` / `.bat` shims itself and launches
-them through `cmd.exe` only when needed.
+Use PATH-based commands only for workspace-owned tools that are expected
+on PATH. AXF resolves npm `.cmd` / `.bat` shims itself and launches them
+through `cmd.exe` only when needed. The built-in `global.lex.*` family is
+package-local and should not be copied as a bare `"command": "lex"`
+manifest.
 
 ### WSL
 
-Prefer Linux-native `axf`, `lex`, `node`, and `npm` ahead of Windows
-PATH entries. `axf doctor` warns when commands resolve under
+Prefer Linux-native `axf`, `node`, and `npm` ahead of Windows PATH
+entries. `axf doctor` warns when commands resolve under
 `/mnt/c/...`, which usually means Windows shims are leaking into WSL.
 
 ### Linux / macOS

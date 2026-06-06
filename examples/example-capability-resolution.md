@@ -54,8 +54,7 @@ Resolved ID: `global.lex.status` (lifecycleState `active`).
 Execution plan:
 - type adapter: `cli`
 - provider adapter: none
-- execution target: `lex introspect --json --format compact`, declared
-  in the imported Lex family manifest
+- execution target: `node <AXF package root>/node_modules/@smartergpt/lex/dist/shared/cli/lex.js introspect --json --format compact`, declared in the imported Lex family manifest
 
 The registry synthesizes this capability from
 `manifests/families/lex.family.json`. Lex is the reference capability
@@ -70,7 +69,7 @@ The generic `cli` adapter parses JSON stdout when the provider emits it:
   meta: {
     capabilityId: "global.lex.status",
     adapterType: "cli",
-    command: "lex"
+    command: "node"
   }
 }
 ```
