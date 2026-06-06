@@ -138,6 +138,172 @@ test("axf MCP inspect shows package-local framework Lex launch plan", async () =
   assert.equal(result.launchPlan.targetSource, "relative:framework");
 });
 
+test("axf MCP inspect surfaces split registry and execution workspaces", async () => {
+  const registryRoot = await mkdtemp(
+    path.join(os.tmpdir(), "axf-mcp-registry-"),
+  );
+  const executionRoot = await mkdtemp(
+    path.join(os.tmpdir(), "axf-mcp-execution-"),
+  );
+  try {
+    await writeFile(
+      path.join(registryRoot, "axf.workspace.json"),
+      JSON.stringify({ manifestVersion: "axf/v0", name: "fixture" }) + "\n",
+    );
+    await mkdir(path.join(registryRoot, "manifests", "capabilities"), {
+      recursive: true,
+    });
+    await mkdir(path.join(registryRoot, "tools"), { recursive: true });
+    await writeFile(
+      path.join(registryRoot, "tools", "echo.mjs"),
+      `console.log(JSON.stringify({ cwd: process.cwd() }));\n`,
+    );
+    await writeFile(
+      path.join(
+        registryRoot,
+        "manifests",
+        "capabilities",
+        "global.demo.inspect-split.json",
+      ),
+      JSON.stringify(
+        {
+          manifestVersion: "axf/v0",
+          id: "global.demo.inspect-split",
+          summary: "demo",
+          provider: "demo",
+          adapterType: "cli",
+          executionTarget: {
+            launcher: { command: process.execPath },
+            target: {
+              path: "tools/echo.mjs",
+              relativeTo: "workspace",
+            },
+          },
+          argsSchema: { type: "object", properties: {} },
+          outputModes: ["json"],
+          sideEffects: "none",
+          scope: "global",
+          lifecycleState: "active",
+          defaults: {},
+          policies: [],
+          owner: "test",
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const result = await performOperation({
+      operation: "inspect",
+      registryWorkspace: registryRoot,
+      executionWorkspace: executionRoot,
+      target: { id: "global.demo.inspect-split" },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.projectRoot.root, registryRoot);
+    assert.equal(result.executionRoot.root, executionRoot);
+    assert.equal(result.workspaces.projectRoot.root, registryRoot);
+    assert.equal(result.workspaces.executionRoot.root, executionRoot);
+    assert.equal(result.executionWorkspace.root, executionRoot);
+    assert.equal(result.launchPlan.cwd, executionRoot);
+    assert.equal(
+      result.launchPlan.targetPath,
+      path.join(registryRoot, "tools", "echo.mjs"),
+    );
+  } finally {
+    await import("node:fs/promises").then(({ rm }) =>
+      Promise.all([
+        rm(registryRoot, { recursive: true, force: true }),
+        rm(executionRoot, { recursive: true, force: true }),
+      ]),
+    );
+  }
+});
+
+test("axf MCP inspect accepts projectRoot and executionRoot aliases", async () => {
+  const registryRoot = await mkdtemp(
+    path.join(os.tmpdir(), "axf-mcp-project-root-"),
+  );
+  const executionRoot = await mkdtemp(
+    path.join(os.tmpdir(), "axf-mcp-execution-root-"),
+  );
+  try {
+    await writeFile(
+      path.join(registryRoot, "axf.workspace.json"),
+      JSON.stringify({ manifestVersion: "axf/v0", name: "fixture" }) + "\n",
+    );
+    await mkdir(path.join(registryRoot, "manifests", "capabilities"), {
+      recursive: true,
+    });
+    await mkdir(path.join(registryRoot, "tools"), { recursive: true });
+    await writeFile(
+      path.join(registryRoot, "tools", "echo.mjs"),
+      `console.log(JSON.stringify({ cwd: process.cwd() }));\n`,
+    );
+    await writeFile(
+      path.join(
+        registryRoot,
+        "manifests",
+        "capabilities",
+        "global.demo.inspect-alias.json",
+      ),
+      JSON.stringify(
+        {
+          manifestVersion: "axf/v0",
+          id: "global.demo.inspect-alias",
+          summary: "demo",
+          provider: "demo",
+          adapterType: "cli",
+          executionTarget: {
+            launcher: { command: process.execPath },
+            target: {
+              path: "tools/echo.mjs",
+              relativeTo: "workspace",
+            },
+          },
+          argsSchema: { type: "object", properties: {} },
+          outputModes: ["json"],
+          sideEffects: "none",
+          scope: "global",
+          lifecycleState: "active",
+          defaults: {},
+          policies: [],
+          owner: "test",
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    const result = await performOperation({
+      operation: "inspect",
+      projectRoot: registryRoot,
+      executionRoot,
+      target: { id: "global.demo.inspect-alias" },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.projectRoot.root, registryRoot);
+    assert.equal(result.executionRoot.root, executionRoot);
+    assert.equal(result.workspaces.projectRoot.root, registryRoot);
+    assert.equal(result.workspaces.executionRoot.root, executionRoot);
+    assert.equal(result.executionWorkspace.root, executionRoot);
+    assert.equal(result.launchPlan.cwd, executionRoot);
+    assert.equal(
+      result.launchPlan.targetPath,
+      path.join(registryRoot, "tools", "echo.mjs"),
+    );
+  } finally {
+    await import("node:fs/promises").then(({ rm }) =>
+      Promise.all([
+        rm(registryRoot, { recursive: true, force: true }),
+        rm(executionRoot, { recursive: true, force: true }),
+      ]),
+    );
+  }
+});
+
 test("axf MCP run executes framework Lex note without bare lex on PATH", async () => {
   const result = await performOperation(
     {

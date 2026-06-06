@@ -23,9 +23,30 @@ export const AXF_TOOL = {
         type: "string",
         enum: AXF_MCP_OPERATIONS,
       },
+      projectRoot: {
+        type: "string",
+        description:
+          "Canonical AXF project root override for manifest and adapter discovery.",
+      },
+      executionRoot: {
+        type: "string",
+        description:
+          "Canonical AXF execution root override for runtime cwd and caller-facing execution.",
+      },
       workspace: {
         type: "string",
-        description: "Optional AXF workspace root override.",
+        description:
+          "Legacy AXF workspace root override that sets both project and execution roots.",
+      },
+      registryWorkspace: {
+        type: "string",
+        description:
+          "Legacy AXF registry workspace override for manifest and adapter discovery.",
+      },
+      executionWorkspace: {
+        type: "string",
+        description:
+          "Legacy AXF execution workspace override for runtime cwd and caller-facing execution.",
       },
       target: {
         type: "object",

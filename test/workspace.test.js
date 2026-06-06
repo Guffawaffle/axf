@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { findWorkspaceRoot, WORKSPACE_MARKER } from "../src/core/workspace.js";
+import {
+    findExecutionWorkspaceRoot,
+    findWorkspaceRoot,
+    WORKSPACE_MARKER,
+} from "../src/core/workspace.js";
 
 async function tmpWorkspace() {
     const root = await mkdtemp(path.join(os.tmpdir(), "ax-ws-"));
@@ -35,6 +39,32 @@ test("AXF_WORKSPACE wins over marker walks", async () => {
     assert.equal(ws.root, root);
     assert.equal(ws.source, "env");
     assert.equal(ws.viaMarker, true);
+});
+
+test("AXF_PROJECT_ROOT and AXF_EXECUTION_ROOT drive split root env resolution", async () => {
+    const projectRoot = await tmpWorkspace();
+    const executionRoot = await mkdtemp(path.join(os.tmpdir(), "ax-exec-root-"));
+
+    const discoveredProjectRoot = findWorkspaceRoot({
+        cwd: "/no/marker/here",
+        env: {
+            AXF_PROJECT_ROOT: projectRoot,
+            AXF_EXECUTION_ROOT: executionRoot,
+        }
+    });
+    const discoveredExecutionRoot = findExecutionWorkspaceRoot({
+        cwd: "/no/marker/here",
+        env: {
+            AXF_PROJECT_ROOT: projectRoot,
+            AXF_EXECUTION_ROOT: executionRoot,
+        }
+    });
+
+    assert.equal(discoveredProjectRoot.root, projectRoot);
+    assert.equal(discoveredProjectRoot.source, "env");
+    assert.equal(discoveredExecutionRoot.root, executionRoot);
+    assert.equal(discoveredExecutionRoot.source, "env");
+    assert.equal(discoveredExecutionRoot.viaMarker, false);
 });
 
 test("walks ancestors of cwd to find marker file", async () => {
