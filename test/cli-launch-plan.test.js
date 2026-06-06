@@ -164,6 +164,58 @@ test("cli adapter resolves a workspace-relative target through a declared launch
   }
 });
 
+test("cli launch plans use registry workspace for targets and execution workspace for cwd", () => {
+  const registryWorkspace = path.join(
+    os.tmpdir(),
+    `ax-cli-registry-${Date.now()}`,
+  );
+  const executionWorkspace = path.join(
+    os.tmpdir(),
+    `ax-cli-execution-${Date.now()}`,
+  );
+
+  const launchPlan = resolveCliLaunchPlan(
+    {
+      id: "global.demo.split-workspace",
+      executionTarget: {
+        launcher: { command: process.execPath },
+        target: {
+          path: "tools/echo.mjs",
+          relativeTo: "workspace",
+        },
+        args: ["seed"],
+      },
+    },
+    {
+      runtime: {
+        registryWorkspace: {
+          root: registryWorkspace,
+          viaMarker: true,
+          source: "explicit",
+        },
+        executionWorkspace: {
+          root: executionWorkspace,
+          viaMarker: false,
+          source: "cwd-fallback",
+        },
+        workspace: {
+          root: executionWorkspace,
+          viaMarker: false,
+          source: "cwd-fallback",
+        },
+      },
+    },
+  );
+
+  assert.equal(launchPlan.cwd, executionWorkspace);
+  assert.equal(launchPlan.cwdSource, "workspace");
+  assert.equal(
+    launchPlan.targetPath,
+    path.join(registryWorkspace, "tools", "echo.mjs"),
+  );
+  assert.equal(launchPlan.targetSource, "relative:workspace");
+});
+
 test("cli execution uses bound workspace cwd when invoked elsewhere", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));
   const caller = await mkdtemp(path.join(os.tmpdir(), "ax-cli-caller-"));
@@ -407,6 +459,74 @@ test("inspect --json includes the resolved cli launch plan", async () => {
     assert.equal(parsed.launchPlan.targetSource, "relative:workspace");
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("inspect --json surfaces split registry and execution workspaces", async () => {
+  const registryRoot = await mkdtemp(path.join(os.tmpdir(), "ax-cli-launch-"));
+  const executionRoot = await mkdtemp(
+    path.join(os.tmpdir(), "ax-cli-execution-"),
+  );
+  try {
+    await bootstrapWorkspace(registryRoot);
+    await mkdir(path.join(registryRoot, "tools"), { recursive: true });
+    await writeFile(
+      path.join(registryRoot, "tools", "echo.mjs"),
+      `console.log(JSON.stringify({ cwd: process.cwd() }));\n`,
+    );
+    await writeCapability(registryRoot, {
+      manifestVersion: "axf/v0",
+      id: "global.demo.inspect-split",
+      summary: "demo",
+      provider: "demo",
+      adapterType: "cli",
+      executionTarget: {
+        launcher: {
+          command: process.execPath,
+        },
+        target: {
+          path: "tools/echo.mjs",
+          relativeTo: "workspace",
+        },
+      },
+      argsSchema: { type: "object", properties: {} },
+      outputModes: ["json"],
+      sideEffects: "none",
+      scope: "global",
+      lifecycleState: "active",
+      defaults: {},
+      policies: [],
+      owner: "test",
+    });
+
+    const out = await captureStdout(() =>
+      main(
+        [
+          "--registry-workspace",
+          registryRoot,
+          "--execution-workspace",
+          executionRoot,
+          "inspect",
+          "global.demo.inspect-split",
+          "--json",
+        ],
+        { cwd: executionRoot, env: process.env },
+      ),
+    );
+    const parsed = JSON.parse(out);
+
+    assert.equal(parsed.projectRoot.root, registryRoot);
+    assert.equal(parsed.executionRoot.root, executionRoot);
+    assert.equal(parsed.workspaces.projectRoot.root, registryRoot);
+    assert.equal(parsed.workspaces.executionRoot.root, executionRoot);
+    assert.equal(parsed.launchPlan.cwd, executionRoot);
+    assert.equal(
+      parsed.launchPlan.targetPath,
+      path.join(registryRoot, "tools", "echo.mjs"),
+    );
+  } finally {
+    await rm(registryRoot, { recursive: true, force: true });
+    await rm(executionRoot, { recursive: true, force: true });
   }
 });
 

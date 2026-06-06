@@ -10,7 +10,7 @@ export const AXF_MCP_OPERATIONS = Object.freeze([
 ]);
 
 export const AXF_TOOL_DESCRIPTION =
-  "AXF capability router. Use this single MCP tool to list, inspect, and run AXF capabilities. Capabilities such as global.lex.status are not separate MCP tools. Call with operation=help, list, inspect, run, doctor, or scout_check. Always inspect before run and respect lifecycle/sideEffects/policy metadata.";
+  "AXF capability router. Use this single MCP tool to list, inspect, and run AXF capabilities. Capabilities such as global.lex.status are not separate MCP tools. Call with operation=help, list, inspect, run, doctor, or scout_check. Always inspect before run, and use projectRoot/executionRoot when discovery and execution roots differ.";
 
 export const AXF_MCP_CAPABILITY_EXAMPLES = Object.freeze([
   "global.lex.status",
@@ -38,6 +38,8 @@ export const AXF_MCP_EXAMPLES = Object.freeze([
     title: "inspect global.lex.status",
     arguments: {
       operation: "inspect",
+      projectRoot: "/repo/with/manifests",
+      executionRoot: "/caller/workspace",
       target: { id: "global.lex.status" },
     },
   },

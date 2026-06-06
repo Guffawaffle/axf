@@ -140,6 +140,14 @@ test("run --allow-draft (deprecated) still works as alias", async () => {
   assert.equal(result.ok, true);
 });
 
+test("help documents canonical project and execution root flags", async () => {
+  const out = await captureStdout(() => main(["help"]));
+  assert.match(out, /--project-root <path>/);
+  assert.match(out, /--execution-root <path>/);
+  assert.match(out, /--registry-workspace <path>\s+Legacy alias for --project-root/);
+  assert.match(out, /--execution-workspace <path>\s+Legacy alias for --execution-root/);
+});
+
 test("list --any-lifecycle includes drafts", async () => {
   const root = await bootstrap();
   await writeCap(root, basicCap({ lifecycleState: "draft" }));
@@ -176,6 +184,54 @@ test("inspect resolves a workspace-local capability via shorthand", async () => 
   );
   const parsed = JSON.parse(out);
   assert.equal(parsed.capability.id, "workspace.repo.status");
+});
+
+test("project-root and execution-root aliases drive split root behavior", async () => {
+  const registryRoot = await bootstrap();
+  const executionRoot = await mkdtemp(path.join(os.tmpdir(), "ax-cli-execution-"));
+  await mkdir(path.join(registryRoot, "tools"), { recursive: true });
+  await writeFile(
+    path.join(registryRoot, "tools", "cwd.mjs"),
+    `console.log(JSON.stringify({ cwd: process.cwd() }));\n`,
+  );
+  await writeCap(
+    registryRoot,
+    basicCap({
+      id: "global.demo.cwd",
+      adapterType: "cli",
+      lifecycleState: "active",
+      executionTarget: {
+        launcher: { command: process.execPath },
+        target: {
+          path: "tools/cwd.mjs",
+          relativeTo: "workspace",
+        },
+      },
+    }),
+  );
+
+  const out = await captureStdout(() =>
+    main([
+      "--project-root",
+      registryRoot,
+      "--execution-root",
+      executionRoot,
+      "inspect",
+      "demo",
+      "cwd",
+      "--json",
+    ]),
+  );
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.projectRoot.root, registryRoot);
+  assert.equal(parsed.executionRoot.root, executionRoot);
+  assert.equal(parsed.workspaces.projectRoot.root, registryRoot);
+  assert.equal(parsed.workspaces.executionRoot.root, executionRoot);
+  assert.equal(parsed.launchPlan.cwd, executionRoot);
+  assert.equal(
+    parsed.launchPlan.targetPath,
+    path.join(registryRoot, "tools", "cwd.mjs"),
+  );
 });
 
 test("promote --json emits a structured response", async () => {
@@ -253,20 +309,22 @@ test("doctor --json includes workspace block with viaMarker flag", async () => {
     main(["--workspace", root, "doctor", "--json"]),
   );
   const parsed = JSON.parse(out);
+  assert.ok(parsed.projectRoot, "doctor JSON should include projectRoot block");
+  assert.equal(parsed.projectRoot.root, root);
   assert.ok(parsed.workspace, "doctor JSON should include workspace block");
   assert.equal(parsed.workspace.root, root);
   assert.equal(parsed.workspace.viaMarker, true);
   assert.equal(parsed.workspace.source, "explicit");
 });
 
-test("list reports workspace notes when an explicit workspace is empty and unmarked", async () => {
+test("list reports project-root notes when an explicit root is empty and unmarked", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "ax-cli-empty-"));
 
   const out = await captureStdout(() => main(["--workspace", root, "list"]));
 
   assert.match(
     out,
-    /explicit workspace '.*' does not contain axf\.workspace\.json/,
+    /explicit project root '.*' does not contain axf\.workspace\.json/,
   );
   assert.match(out, /has no axf manifests yet/);
   assert.match(out, /has zero capabilities/);

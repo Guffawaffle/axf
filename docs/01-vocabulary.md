@@ -6,16 +6,68 @@ identifier.
 
 If a later design doc uses different language for these ideas, prefer the terms here unless there is a deliberate replacement.
 
+## Canonical root and platform nouns
+
+Use these nouns when describing platform boundaries, runtime anchoring, or
+editor integration. These terms are meant to stay stable even if legacy AXF
+flag or field names remain in compatibility mode for a while.
+
+### Machine
+
+The ambient computer or user-profile environment.
+
+Examples:
+
+- PATH
+- globally installed CLIs
+- shell defaults
+- user-level editor settings
+
+### Editor workspace
+
+The editor session container, such as a VS Code multi-root workspace or
+`.code-workspace` file.
+
+This is not automatically the same as a repo root, an AXF discovery root, or a
+process execution cwd.
+
+### Project root
+
+The repo or tool-owned discovery/config anchor.
+
+For AXF, this is the root from which manifests, adapters, and repo-local AXF
+configuration are discovered.
+
+### Execution root
+
+The cwd/runtime anchor for child-process execution.
+
+This is the directory AXF uses when a capability runs or when a relative
+execution cwd must be resolved.
+
+### Caller context
+
+The invoking context presented by the operator, shell, editor, or MCP host.
+
+Examples:
+
+- the current process cwd
+- request-time environment variables
+- the active editor session that launched AXF
+
 ## Workspace
 
-A concrete repo, directory, or execution context in which AXF is running.
+`workspace` is now treated as contextual language, not the preferred primary
+term for new AXF platform contracts.
 
-A workspace may declare:
+Use it only when one of the following is clearly intended:
 
-- which toolspace is active
-- which modules are mounted
-- which policies apply
-- what local defaults exist
+- `editor workspace` for IDE session state
+- `workspace-local` for AXF capability scope
+- compatibility aliases such as `--workspace` or `AXF_WORKSPACE`
+
+Avoid bare `workspace` when the real meaning is either `project root`,
+`execution root`, or `machine`.
 
 ## Toolspace
 
