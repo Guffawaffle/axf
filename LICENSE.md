@@ -2,7 +2,7 @@ SmarterGPT Source-Available Personal Use License
 
 Version 1.0
 
-Copyright (c) Joseph Guff / Guffawaffle / SmarterGPT. All rights reserved.
+Copyright (c) Joseph Gustavson / Guffawaffle / SmarterGPT. All rights reserved.
 
 ## 1. Purpose
 
@@ -16,7 +16,7 @@ Unless a separate written agreement says otherwise, this license does not grant 
 
 "Software" means the source code, documentation, schemas, examples, tests, configuration files, package materials, adapters, scripts, diagrams, and related materials in this repository.
 
-"Maintainer" means Joseph Guff / Guffawaffle / SmarterGPT.
+"Maintainer" means Joseph Gustavson / Guffawaffle / SmarterGPT.
 
 "Personal Use" means use by an individual person for private learning, experimentation, evaluation, research, non-commercial development, or personal projects not performed for an employer, client, company, organization, institution, or commercial purpose.
 

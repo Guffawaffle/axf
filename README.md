@@ -42,7 +42,7 @@ License](./LICENSE.md).
 
 Commercial use, organizational use, employer/client use, production use,
 hosted-service use, redistribution, sublicensing, or embedding in another
-product or platform requires a separate written license from Joseph Guff /
+product or platform requires a separate written license from Joseph Gustavson /
 Guffawaffle / SmarterGPT.
 
 Public visibility on GitHub does not grant open-source rights or
