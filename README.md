@@ -34,17 +34,19 @@ capabilities agents use as their local exoskeleton.
 
 ### License
 
-AXF is source-available under the custom personal-use license in
-[`LICENSE`](LICENSE). It is not open source.
+This repository is **source-available**, not open source.
 
-Permitted use is limited to personal, non-commercial evaluation,
-development, and local execution.
+You may view, fork, modify, and run this project for personal,
+non-commercial use under the [SmarterGPT Source-Available Personal Use
+License](./LICENSE.md).
 
-Redistribution, resale, sublicensing, commercial use, business use,
-production use, internal organizational use, SaaS use, managed-service
-use, and embedding in another product, service, SDK, platform, agent,
-workflow system, or commercial tooling require a separate written
-license.
+Commercial use, organizational use, employer/client use, production use,
+hosted-service use, redistribution, sublicensing, or embedding in another
+product or platform requires a separate written license from Joseph Guff /
+Guffawaffle / SmarterGPT.
+
+Public visibility on GitHub does not grant open-source rights or
+business-use rights.
 
 The npm package name is `@smartergpt/axf`. It installs two bins:
 
