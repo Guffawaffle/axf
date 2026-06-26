@@ -16,7 +16,7 @@
     "schemas/",
     "axf.workspace.json",
     "README.md",
-    "LICENSE"
+    "LICENSE.md"
   ],
   "scripts": {
     "axf": "node bin/axf.js",
