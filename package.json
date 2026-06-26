@@ -41,7 +41,7 @@
     "url": "https://github.com/Guffawaffle/axf/issues"
   },
   "mcpName": "dev.smartergpt/axf",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "SEE LICENSE IN LICENSE.md",
   "publishConfig": {
     "access": "public"
   },
