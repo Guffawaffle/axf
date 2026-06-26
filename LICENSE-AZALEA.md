@@ -252,12 +252,12 @@ Date:
 
 ## Exhibit A: Licensed Snapshot
 
-| Project    | Repository URL                            | Package                 | Commit                                     | Tag  | Snapshot Date | Public License                                        |
-| ---------- | ----------------------------------------- | ----------------------- | ------------------------------------------ | ---- | ------------- | ----------------------------------------------------- |
-| LexThority | https://github.com/Guffawaffle/lexthority | `lexthority`            | `0e245907963917ea5646bb00a1150e89c415ccd4` | None | 2026-06-26    | SmarterGPT Source-Available Personal Use License v1.0 |
-| AXF        | https://github.com/Guffawaffle/axf        | `@smartergpt/axf`       | `a29c7ec5685d5f19e63f0a6e8abb270881d64774` | None | 2026-06-26    | SmarterGPT Source-Available Personal Use License v1.0 |
-| LexRunner  | https://github.com/Guffawaffle/lexrunner  | `@smartergpt/lexrunner` | `d0428cfab080688cb44c721b3d4ce55406228f0b` | None | 2026-06-26    | SmarterGPT Source-Available Personal Use License v1.0 |
-| LexSona    | https://github.com/Guffawaffle/lexsona    | `@smartergpt/lexsona`   | `f6b634eedba01fd427ce7888b802a65f5dda76f2` | None | 2026-06-26    | SmarterGPT Source-Available Personal Use License v1.0 |
+| Project    | Repository URL                            | Package                 | Commit                                     | Tag                                       | Snapshot Date | Public License                                        |
+| ---------- | ----------------------------------------- | ----------------------- | ------------------------------------------ | ----------------------------------------- | ------------- | ----------------------------------------------------- |
+| LexThority | https://github.com/Guffawaffle/lexthority | `lexthority`            | `0e245907963917ea5646bb00a1150e89c415ccd4` | `azalea-internal-use-snapshot-2026-06-26` | 2026-06-26    | SmarterGPT Source-Available Personal Use License v1.0 |
+| AXF        | https://github.com/Guffawaffle/axf        | `@smartergpt/axf`       | `a29c7ec5685d5f19e63f0a6e8abb270881d64774` | `azalea-internal-use-snapshot-2026-06-26` | 2026-06-26    | SmarterGPT Source-Available Personal Use License v1.0 |
+| LexRunner  | https://github.com/Guffawaffle/lexrunner  | `@smartergpt/lexrunner` | `d0428cfab080688cb44c721b3d4ce55406228f0b` | `azalea-internal-use-snapshot-2026-06-26` | 2026-06-26    | SmarterGPT Source-Available Personal Use License v1.0 |
+| LexSona    | https://github.com/Guffawaffle/lexsona    | `@smartergpt/lexsona`   | `f6b634eedba01fd427ce7888b802a65f5dda76f2` | `azalea-internal-use-snapshot-2026-06-26` | 2026-06-26    | SmarterGPT Source-Available Personal Use License v1.0 |
 
 ## Exhibit B: Lex OSS Core Reference
 
