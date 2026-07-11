@@ -1,0 +1,49 @@
+{
+  "manifestVersion": "axf/v0",
+  "id": "workspace.agent.session-context",
+  "summary": "Compose bounded AXF workflow guidance with prompt-safe Lex history",
+  "provider": "workspace",
+  "adapterType": "cli",
+  "executionTarget": {
+    "target": {
+      "path": "scripts/axf/session-context.mjs",
+      "relativeTo": "workspace"
+    },
+    "launcher": {
+      "command": "node"
+    },
+    "cwd": {
+      "path": ".",
+      "relativeTo": "workspace"
+    }
+  },
+  "argsSchema": {
+    "type": "object",
+    "properties": {
+      "intent": { "type": "string" },
+      "project-root": { "type": "string" },
+      "execution-root": { "type": "string" },
+      "branch": { "type": "string" },
+      "limit": { "type": "integer", "minimum": 1, "maximum": 20 },
+      "max-tokens": { "type": "integer", "minimum": 256, "maximum": 4000 },
+      "max-output-chars": { "type": "integer", "minimum": 2000, "maximum": 30000 }
+    },
+    "additionalProperties": false
+  },
+  "outputModes": ["json", "text"],
+  "sideEffects": "read",
+  "scope": "workspace-local",
+  "lifecycleState": "active",
+  "defaults": {
+    "intent": "session bootstrap",
+    "limit": 5,
+    "max-tokens": 1200,
+    "max-output-chars": 16000
+  },
+  "policies": ["require_workspace_binding"],
+  "owner": "workspace:agent-continuity",
+  "recommendedFor": ["session-start"],
+  "examples": [
+    "axf run workspace.agent.session-context --intent 'continue current work' --json"
+  ]
+}

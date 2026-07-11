@@ -74,6 +74,20 @@ axf mcp
 axf-mcp
 ```
 
+Audit a Codex MCP package pin before assuming the configured server matches the
+installed CLI:
+
+```sh
+axf integrate codex --check
+axf integrate codex --write
+axf integrate codex --check --smoke
+```
+
+Writes are scoped to the AXF package spec in Codex `config.toml`; restart or
+reopen Codex afterward. For one-call AXF + Lex bootstrap, see the packaged
+`templates/session-context` workspace recipe and
+[`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md).
+
 ### Repo-local dev launch
 
 From a local clone, run the bins directly with Node:

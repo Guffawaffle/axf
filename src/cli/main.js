@@ -23,6 +23,7 @@ import {
   normalizeDiscoveryLimit,
   selectCapabilities,
 } from "../core/discovery.js";
+import { integrateCodex } from "../core/codex-integration.js";
 
 const COMMANDS = new Set([
   "list",
@@ -35,6 +36,7 @@ const COMMANDS = new Set([
   "promote",
   "demote",
   "scout",
+  "integrate",
   "mcp",
   "help",
 ]);
@@ -79,6 +81,10 @@ export async function main(argv, env = {}) {
   }
   if (command === "scout") {
     await scoutCommand(rootDir, rest, processEnv);
+    return;
+  }
+  if (command === "integrate") {
+    await integrateCommand(rest, workspaces, processEnv);
     return;
   }
   if (command === "mcp") {
@@ -1080,6 +1086,55 @@ async function doctorCommand(
   }
 }
 
+async function integrateCommand(tokens, workspaces, env) {
+  const parsed = parseOptionTokens(tokens);
+  const [target] = parsed.positionals;
+  if (target === "--help" || parsed.options.help) {
+    printIntegrateHelp();
+    return;
+  }
+  if (target !== "codex") {
+    throw new AxError("integrate currently requires target 'codex'", 2);
+  }
+  if (parsed.options.check && parsed.options.write) {
+    throw new AxError("integrate codex accepts only one of --check or --write", 2);
+  }
+
+  const report = await integrateCodex({
+    configPath: parsed.options.config,
+    write: Boolean(parsed.options.write),
+    smoke: Boolean(parsed.options.smoke),
+    projectRoot: workspaces.registryWorkspace.root,
+    executionRoot: workspaces.executionWorkspace.root,
+    env,
+  });
+
+  if (parsed.options.json) {
+    printJson(report);
+  } else {
+    console.log(`Codex config: ${report.config.path} (${report.config.source})`);
+    console.log(`Running AXF: ${report.runtime.version}`);
+    if (report.configured) {
+      console.log(`MCP server: ${report.configured.id}`);
+      console.log(`  command: ${report.configured.command ?? "<missing>"}`);
+      console.log(`  args: ${JSON.stringify(report.configured.args)}`);
+      console.log(`  cwd: ${report.configured.cwd ?? "<not set>"}`);
+      console.log(`  package: ${report.configured.packageSpec ?? "<unversioned>"}`);
+      console.log(`  status: ${report.configured.status}`);
+      console.log(`  root env: ${JSON.stringify(report.configured.rootEnvironment)}`);
+    }
+    for (const issue of report.issues) {
+      console.log(`${issue.severity}: ${issue.code}: ${issue.message}`);
+    }
+    if (report.action.changed) console.log(report.action.next);
+    if (report.smoke) console.log(`MCP smoke: ${report.smoke.ok ? "passed" : "failed"}`);
+  }
+
+  if (!report.ok) {
+    throw new AxError("Codex AXF integration check failed", 1);
+  }
+}
+
 function buildRuntime(
   workspaces = null,
   env = process.env,
@@ -1245,6 +1300,7 @@ Usage:
     axf promote <id> --to <draft|reviewed|active> [--json]
     axf demote <id> --to <draft|reviewed> [--json]
     axf scout [--check|--write] [--json]
+    axf integrate codex [--check|--write] [--smoke] [--config <path>] [--json]
     axf doctor [--json]
     axf mcp
 
@@ -1264,8 +1320,26 @@ Examples:
     axf init adapter --kind provider acme --composes cli
     axf promote global.acme.status --to active
     axf scout --check
+    axf integrate codex --check
     axf mcp
 `);
+}
+
+function printIntegrateHelp() {
+  console.log(`axf integrate codex
+
+  Usage:
+    axf integrate codex [--check|--write] [--smoke] [--config <path>] [--json]
+
+  Options:
+    --check           Report stale or ambiguous Codex AXF MCP configuration (default).
+    --write           Replace only the configured @smartergpt/axf package pin.
+    --smoke           Run MCP initialize, tools/list, and explicit-root doctor checks.
+    --config <path>   Override ~/.codex/config.toml discovery.
+    --json            Emit the bounded integration report as JSON.
+
+  A successful write requires Codex to be restarted or reopened.
+  `);
 }
 
 function printScoutHelp() {
