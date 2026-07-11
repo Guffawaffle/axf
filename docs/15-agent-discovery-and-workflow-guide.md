@@ -25,6 +25,12 @@ effects, provenance, and an inspect invocation. `guide` never executes a
 capability. Results default to 12 entries and are always bounded by a maximum
 of 100.
 
+When a workspace declares a composite session-context capability, prefer that
+single operation for startup/resume/compaction. The packaged
+`templates/session-context` recipe combines AXF guidance with bounded Lex
+history without coupling Lex into AXF core. Its provider is read-only and
+degrades to whichever component is available.
+
 ## Workspace recommendations
 
 Declare repo-owned entrypoints in `axf.workspace.json`:
