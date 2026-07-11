@@ -334,7 +334,7 @@ test("list reports project-root notes when an explicit root is empty and unmarke
     out,
     /explicit project root '.*' does not contain axf\.workspace\.json/,
   );
-  assert.match(out, /has no axf manifests yet/);
+  assert.match(out, /has no local axf manifests yet/);
   assert.match(out, /has zero capabilities/);
   assert.match(out, /no capabilities found/);
 });

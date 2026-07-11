@@ -407,6 +407,8 @@ test("axf reports actionable guidance when operation is missing", async () => {
   assert.deepEqual(result.error.availableOperations, [
     "help",
     "list",
+    "guide",
+    "explain",
     "inspect",
     "run",
     "doctor",

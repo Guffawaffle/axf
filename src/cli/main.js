@@ -16,9 +16,18 @@ import {
   collectRuntimeDiagnostics,
   summarizeWorkspaceBinding,
 } from "../core/runtime-diagnostics.js";
+import {
+  buildCapabilityExamples,
+  buildWorkflowGuide,
+  explainCapability,
+  normalizeDiscoveryLimit,
+  selectCapabilities,
+} from "../core/discovery.js";
 
 const COMMANDS = new Set([
   "list",
+  "guide",
+  "explain",
   "inspect",
   "run",
   "init",
@@ -109,6 +118,14 @@ export async function main(argv, env = {}) {
 
   if (command === "list") {
     await listCommand(registry, rest, workspaces, { cwd });
+    return;
+  }
+  if (command === "guide") {
+    await guideCommand(registry, rest, workspaces, { cwd });
+    return;
+  }
+  if (command === "explain") {
+    await explainCommand(registry, rest, workspaces, { cwd });
     return;
   }
   if (command === "inspect") {
@@ -217,7 +234,18 @@ async function listCommand(
     parsed.options["include-drafts"] ??
     parsed.options["allow-draft"],
   );
-  const capabilities = registry.listCapabilities({ includeDrafts });
+  const compact = Boolean(parsed.options.compact);
+  const selection = selectCapabilities(registry, {
+    includeDrafts,
+    compact,
+    search: parsed.options.search ?? null,
+    sideEffects: parsed.options["side-effects"] ?? null,
+    limit:
+      parsed.options.limit === undefined
+        ? undefined
+        : normalizeDiscoveryLimit(parsed.options.limit, null),
+  });
+  const capabilities = selection.capabilities;
   const workspaceSummary = summarizeWorkspaceBinding(
     registry,
     workspaces?.registryWorkspace ?? null,
@@ -230,6 +258,10 @@ async function listCommand(
   if (parsed.options.json) {
     printJson({
       capabilities,
+      count: selection.count,
+      total: selection.total,
+      truncated: selection.truncated,
+      filters: selection.filters,
       projectRoot: workspaceSummary.projectRoot,
       executionRoot: workspaceSummary.executionRoot,
       workspace: workspaceSummary.workspace,
@@ -250,10 +282,121 @@ async function listCommand(
   }
 
   for (const capability of capabilities) {
+    if (compact) {
+      console.log(
+        `${capability.id} — ${capability.summary} [${capability.lifecycleState}; ${formatSideEffects(capability.sideEffects)}; ${capability.sourceKind}]`,
+      );
+      continue;
+    }
     const source = capability.sourceCapabilityId
       ? ` -> ${capability.sourceCapabilityId}`
       : "";
     console.log(`${capability.id} [${capability.lifecycleState}]${source}`);
+  }
+  if (selection.truncated) {
+    console.log(
+      `note: showing ${selection.count} of ${selection.total}; refine with --search or increase --limit`,
+    );
+  }
+}
+
+async function guideCommand(
+  registry,
+  tokens,
+  workspaces = null,
+  { cwd = process.cwd() } = {},
+) {
+  const parsed = parseOptionTokens(tokens);
+  const [positionalIntent] = parsed.positionals;
+  const workspaceSummary = summarizeWorkspaceBinding(
+    registry,
+    workspaces?.registryWorkspace ?? null,
+    {
+      cwd,
+      executionWorkspace: workspaces?.executionWorkspace ?? null,
+    },
+  );
+  const guide = await buildWorkflowGuide(registry, {
+    projectRoot: workspaces?.registryWorkspace?.root ?? null,
+    intent: parsed.options.intent ?? positionalIntent ?? null,
+    limit:
+      parsed.options.limit === undefined
+        ? undefined
+        : normalizeDiscoveryLimit(parsed.options.limit, null),
+  });
+
+  if (parsed.options.json) {
+    printJson({
+      ...guide,
+      projectRoot: workspaceSummary.projectRoot,
+      executionRoot: workspaceSummary.executionRoot,
+      workspaces: workspaceSummary.workspaces,
+      notes: workspaceSummary.notes,
+    });
+    return;
+  }
+
+  for (const note of workspaceSummary.notes) console.log(`note: ${note}`);
+  for (const warning of guide.warnings) console.log(`warning: ${warning}`);
+  if (guide.recommendations.length === 0) {
+    console.log(
+      "no workflow recommendations declared; add recommendations to axf.workspace.json or recommendedFor to a capability/family command",
+    );
+    return;
+  }
+  for (const recommendation of guide.recommendations) {
+    console.log(
+      `${recommendation.label}: ${recommendation.capabilityId} [${recommendation.status}; ${recommendation.lifecycleState ?? "unknown"}; ${formatSideEffects(recommendation.sideEffects)}]`,
+    );
+    if (recommendation.summary) console.log(`  ${recommendation.summary}`);
+  }
+}
+
+async function explainCommand(
+  registry,
+  tokens,
+  workspaces = null,
+  { cwd = process.cwd() } = {},
+) {
+  const { pathTokens, options } = splitCommandTokens(tokens);
+  if (pathTokens.length === 0) {
+    throw new AxError(
+      "explain requires a capability id, path, family, or search term",
+      2,
+    );
+  }
+  const workspaceSummary = summarizeWorkspaceBinding(
+    registry,
+    workspaces?.registryWorkspace ?? null,
+    {
+      cwd,
+      executionWorkspace: workspaces?.executionWorkspace ?? null,
+    },
+  );
+  const explanation = explainCapability(registry, pathTokens, {
+    includeDrafts: Boolean(
+      options["any-lifecycle"] ??
+      options["include-drafts"] ??
+      options["allow-draft"],
+    ),
+    workspaceSummary,
+  });
+  if (options.json) {
+    printJson({
+      ...explanation,
+      projectRoot: workspaceSummary.projectRoot,
+      executionRoot: workspaceSummary.executionRoot,
+      workspaces: workspaceSummary.workspaces,
+      notes: workspaceSummary.notes,
+    });
+    return;
+  }
+  console.log(`${explanation.query}: ${explanation.status}`);
+  for (const reason of explanation.reasons) {
+    console.log(`reason: ${reason.code}: ${reason.message}`);
+  }
+  for (const suggestion of explanation.suggestions ?? []) {
+    console.log(`suggestion: ${suggestion.id} — ${suggestion.summary}`);
   }
 }
 
@@ -303,6 +446,7 @@ async function inspectCommand(
     const summarizedWorkspaces = summarizeWorkspaces(workspaces);
     const payload = {
       ...resolved,
+      examples: buildCapabilityExamples(cap),
       projectRoot: summarizedWorkspaces?.projectRoot ?? null,
       executionRoot: summarizedWorkspaces?.executionRoot ?? null,
       workspaces: summarizedWorkspaces,
@@ -386,6 +530,21 @@ async function inspectCommand(
     }
     if (launchPlan.cwd) {
       console.log(`launch.cwd: ${launchPlan.cwd} (${launchPlan.cwdSource})`);
+    }
+  }
+  const examples = buildCapabilityExamples(cap);
+  for (const declared of examples.declared) {
+    console.log(
+      `example: ${typeof declared === "string" ? declared : JSON.stringify(declared)}`,
+    );
+  }
+  console.log(`example.inspect: ${examples.inspect.cli}`);
+  console.log(`example.run: ${examples.run.cli}`);
+  for (const mapping of examples.argumentMapping) {
+    if (mapping.providerFlag) {
+      console.log(
+        `arg.${mapping.publicName}: ${mapping.publicFlag} -> ${mapping.providerFlag}`,
+      );
     }
   }
 }
@@ -616,6 +775,11 @@ function printMetadataField(label, value) {
   for (const line of rendered.split("\n")) {
     console.log(`  ${line}`);
   }
+}
+
+function formatSideEffects(value) {
+  if (Array.isArray(value)) return value.join(",");
+  return value ?? "unknown";
 }
 
 async function initToolspace(rootDir, name) {
@@ -1067,7 +1231,9 @@ Global flags:
   --execution-workspace <path>  Legacy alias for --execution-root.
 
 Usage:
-    axf list [--all|--any-lifecycle] [--json]
+    axf list [--compact] [--search <term>] [--side-effects <kind>] [--limit <n>] [--all|--any-lifecycle] [--json]
+    axf guide [context|check|handoff] [--limit <n>] [--json]
+    axf explain <id-or-path-or-family> [--any-lifecycle] [--json]
     axf inspect <id-or-path> [--json]
     axf run <id-or-path> [--key value] [--json] [--any-lifecycle]
     axf init toolspace <name>
@@ -1087,7 +1253,9 @@ Lifecycle flag:
   --allow-draft          Deprecated alias for --any-lifecycle (warns to stderr).
 
 Examples:
-    axf list
+    axf list --compact --search lex
+    axf guide context
+    axf explain global.lex
     axf inspect echo say
     axf run echo say --message hello
     axf run toy echo say --message hello

@@ -3,6 +3,8 @@ export const AXF_TOOL_NAME = "axf";
 export const AXF_MCP_OPERATIONS = Object.freeze([
   "help",
   "list",
+  "guide",
+  "explain",
   "inspect",
   "run",
   "doctor",
@@ -10,7 +12,7 @@ export const AXF_MCP_OPERATIONS = Object.freeze([
 ]);
 
 export const AXF_TOOL_DESCRIPTION =
-  "AXF capability router. Use this single MCP tool to list, inspect, and run AXF capabilities. Capabilities such as global.echo.say are not separate MCP tools. Call with operation=help, list, inspect, run, doctor, or scout_check. Always inspect before run, and use projectRoot/executionRoot when discovery and execution roots differ.";
+  "AXF capability router. Use this single MCP tool to guide, list, explain, inspect, and run AXF capabilities. Capabilities such as global.echo.say are not separate MCP tools. Prefer guide for bounded workflow entrypoints or list with compact/search for discovery. Always inspect before run, and use projectRoot/executionRoot when discovery and execution roots differ.";
 
 export const AXF_MCP_CAPABILITY_EXAMPLES = Object.freeze(["global.echo.say"]);
 
@@ -28,8 +30,16 @@ export const AXF_MCP_EXAMPLES = Object.freeze([
     arguments: { operation: "help" },
   },
   {
-    title: "list",
-    arguments: { operation: "list" },
+    title: "bounded workflow guide",
+    arguments: { operation: "guide" },
+  },
+  {
+    title: "compact capability search",
+    arguments: { operation: "list", compact: true, search: "echo" },
+  },
+  {
+    title: "explain a missing capability",
+    arguments: { operation: "explain", query: "global.echo" },
   },
   {
     title: "inspect global.echo.say",

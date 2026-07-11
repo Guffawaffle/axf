@@ -11,11 +11,15 @@ Read in this order:
 
 1. [README.md](../README.md) — install + first run
 2. [01-vocabulary.md](01-vocabulary.md) — workspace, module, capability
-3. The four caller commands:
+3. The caller commands:
    - `axf doctor`
-   - `axf list`
+   - `axf guide [context|check|handoff]`
+   - `axf list --compact --search <term>`
+   - `axf explain <id-or-family>`
    - `axf inspect <id-or-path>`
    - `axf run <id-or-path>`
+4. [15-agent-discovery-and-workflow-guide.md](15-agent-discovery-and-workflow-guide.md)
+   — bounded agent bootstrap and discovery diagnostics
 
 That is the entire caller surface. Stop here unless you are integrating
 a provider or building the framework itself.
@@ -62,7 +66,8 @@ Read in this order:
 4. [08-adapter-folder-shape.md](08-adapter-folder-shape.md)
 5. [07-v0-bootstrap-plan.md](07-v0-bootstrap-plan.md)
 6. [14-family-identity-and-layer-precedence-plan.md](14-family-identity-and-layer-precedence-plan.md)
-7. Source: `src/core/`, `adapters/`, `test/`
+7. [15-agent-discovery-and-workflow-guide.md](15-agent-discovery-and-workflow-guide.md)
+8. Source: `src/core/`, `adapters/`, `test/`
 
 Adopt the existing test style (`node:test`, zero deps, real tmp
 workspaces) for any new feature.

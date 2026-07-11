@@ -18,11 +18,13 @@ test("tools/list advertises exactly one tool named axf", async () => {
   assert.equal(response.tools[0].name, "axf");
   assert.equal(
     response.tools[0].description,
-    "AXF capability router. Use this single MCP tool to list, inspect, and run AXF capabilities. Capabilities such as global.echo.say are not separate MCP tools. Call with operation=help, list, inspect, run, doctor, or scout_check. Always inspect before run, and use projectRoot/executionRoot when discovery and execution roots differ.",
+    "AXF capability router. Use this single MCP tool to guide, list, explain, inspect, and run AXF capabilities. Capabilities such as global.echo.say are not separate MCP tools. Prefer guide for bounded workflow entrypoints or list with compact/search for discovery. Always inspect before run, and use projectRoot/executionRoot when discovery and execution roots differ.",
   );
   assert.deepEqual(response.tools[0].inputSchema.properties.operation.enum, [
     "help",
     "list",
+    "guide",
+    "explain",
     "inspect",
     "run",
     "doctor",

@@ -10,6 +10,12 @@ import {
   collectRuntimeDiagnostics,
   summarizeWorkspaceBinding,
 } from "../core/runtime-diagnostics.js";
+import {
+  buildCapabilityExamples,
+  buildWorkflowGuide,
+  explainCapability,
+  selectCapabilities,
+} from "../core/discovery.js";
 import { scoutWorkspace } from "../core/scout.js";
 import { findWorkspacePair } from "../core/workspace.js";
 import {
@@ -47,6 +53,10 @@ export async function performOperation(rawInput, options = {}) {
         return performHelp(context);
       case "list":
         return performList(context);
+      case "guide":
+        return await performGuide(context);
+      case "explain":
+        return performExplain(context);
       case "inspect":
         return await performInspect(context);
       case "run":
@@ -90,9 +100,11 @@ function performHelp(context) {
         routingNote:
           "Capabilities such as global.echo.say are discovered through the single axf MCP tool, not exposed as separate MCP tools.",
         capabilityExamples: AXF_MCP_CAPABILITY_EXAMPLES,
-        discoveryFlow: ["list", "inspect", "run"],
+        discoveryFlow: ["guide", "list", "explain", "inspect", "run"],
         runRules: [
           "Use operation=list to discover capabilities.",
+          "Prefer operation=guide for bounded workspace workflow entrypoints.",
+          "Use operation=explain when an expected capability is absent.",
           "Use operation=inspect before operation=run.",
           "Use operation=run only with args matching inspect output.",
           "Respect lifecycle, sideEffects, policies, and workspace binding.",
@@ -125,8 +137,23 @@ function performHelp(context) {
         },
         {
           name: "list",
-          purpose: "Discover capabilities in the current AXF registry.",
+          purpose:
+            "Discover capabilities; compact/search filters avoid returning every full manifest.",
           requiresTarget: false,
+          readOnly: true,
+        },
+        {
+          name: "guide",
+          purpose:
+            "Return bounded workspace-declared context, validation, and handoff entrypoints.",
+          requiresTarget: false,
+          readOnly: true,
+        },
+        {
+          name: "explain",
+          purpose:
+            "Explain why a capability or family is available, filtered, or missing.",
+          requiresTarget: true,
           readOnly: true,
         },
         {
@@ -167,15 +194,62 @@ function performList(context) {
   const includeDrafts = Boolean(
     context.input.includeDrafts ?? context.input.allowAnyLifecycle,
   );
-  const capabilities = context.registry.listCapabilities({ includeDrafts });
+  const selection = selectCapabilities(context.registry, {
+    includeDrafts,
+    compact: Boolean(context.input.compact),
+    search: context.input.search,
+    sideEffects: context.input.sideEffects,
+    limit: context.input.limit ?? undefined,
+  });
 
   return attachWorkspace(
     {
       ok: true,
       operation: "list",
-      capabilities,
-      count: capabilities.length,
+      ...selection,
     },
+    context.workspaceSummary,
+  );
+}
+
+async function performGuide(context) {
+  let guide;
+  try {
+    guide = await buildWorkflowGuide(context.registry, {
+      projectRoot: context.registryWorkspace.root,
+      intent: context.input.intent,
+      limit: context.input.limit ?? undefined,
+    });
+  } catch (error) {
+    throw new MCPInputError(error.message);
+  }
+  return attachWorkspace(
+    { ok: true, operation: "guide", ...guide },
+    context.workspaceSummary,
+  );
+}
+
+function performExplain(context) {
+  const query = context.input.query ?? context.input.target;
+  if (!query) {
+    throw new MCPInputError(
+      "explain requires query or target.id/target.path",
+    );
+  }
+  const queryValue =
+    typeof query === "string"
+      ? query
+      : query.id
+        ? [query.id]
+        : query.path;
+  const explanation = explainCapability(context.registry, queryValue, {
+    includeDrafts: Boolean(
+      context.input.includeDrafts ?? context.input.allowAnyLifecycle,
+    ),
+    workspaceSummary: context.workspaceSummary,
+  });
+  return attachWorkspace(
+    { ok: true, operation: "explain", ...explanation },
     context.workspaceSummary,
   );
 }
@@ -204,6 +278,7 @@ async function performInspect(context) {
     ok: true,
     operation: "inspect",
     ...resolved,
+    examples: buildCapabilityExamples(capability),
   };
 
   if (launchPlan) {
@@ -473,6 +548,12 @@ function validateInput(value) {
     value.allowAnyLifecycle,
     "allowAnyLifecycle",
   );
+  const compact = optionalBoolean(value.compact, "compact");
+  const search = optionalString(value.search, "search");
+  const sideEffects = optionalString(value.sideEffects, "sideEffects");
+  const intent = optionalString(value.intent, "intent");
+  const query = optionalString(value.query, "query");
+  const limit = optionalInteger(value.limit, "limit", { min: 1, max: 100 });
 
   return {
     operation: value.operation,
@@ -485,6 +566,12 @@ function validateInput(value) {
     args,
     includeDrafts,
     allowAnyLifecycle,
+    compact,
+    search,
+    sideEffects,
+    intent,
+    query,
+    limit,
   };
 }
 
@@ -562,6 +649,16 @@ function optionalBoolean(value, label) {
   }
   if (typeof value !== "boolean") {
     throw new MCPInputError(`${label} must be a boolean when provided`);
+  }
+  return value;
+}
+
+function optionalInteger(value, label, { min, max }) {
+  if (value === undefined) return null;
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new MCPInputError(
+      `${label} must be an integer between ${min} and ${max}`,
+    );
   }
   return value;
 }
@@ -647,8 +744,8 @@ function buildOperationSelectionErrorDetails() {
       ),
       createNextStep(
         "call_list",
-        "Call operation=list to discover capability ids in the bound AXF registry.",
-        { operation: "list" },
+        "Call compact operation=list to discover capability ids in the bound AXF registry.",
+        { operation: "list", compact: true, limit: 20 },
       ),
       createNextStep(
         "inspect_before_run",
@@ -683,8 +780,8 @@ function buildRunDiscoveryNextSteps() {
   return [
     createNextStep(
       "call_list",
-      "Call operation=list to discover capability ids.",
-      { operation: "list" },
+      "Call compact operation=list to discover capability ids.",
+      { operation: "list", compact: true, limit: 20 },
     ),
     createNextStep(
       "inspect_before_run",

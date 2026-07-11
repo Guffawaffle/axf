@@ -14,7 +14,12 @@ Create `axf.workspace.json` at the repo root.
 ```json
 {
   "manifestVersion": "axf/v0",
-  "name": "my-repo"
+  "name": "my-repo",
+  "recommendations": {
+    "session-start": "global.my-repo.context",
+    "validation": "global.my-repo.check",
+    "handoff": "global.my-repo.handoff"
+  }
 }
 ```
 
@@ -57,9 +62,11 @@ Keep repo-specific capabilities under:
 
 - `manifests/capabilities/` for single commands
 - `manifests/families/` for reusable command families
+- `manifests/toolspaces/` for mounts
 
 This keeps shared packs stable while repo-local capability work remains
-obvious and reviewable.
+obvious and reviewable. AXF ignores domain JSON elsewhere under `manifests/`,
+so application-owned manifests do not become false doctor errors.
 
 ## 5. Mount shared capabilities only when useful
 
@@ -90,6 +97,10 @@ after the repo or machine layer has intentionally supplied that family.
 AXF does not require MCP. A repo can start with the project marker,
 the built-in echo capability, and local CLI or internal capabilities.
 Add MCP only if the repo actually needs it.
+
+For either surface, `axf guide` is the bounded agent bootstrap. Use
+`axf list --compact --search <term>` for broader discovery and `axf explain`
+when an expected capability is absent.
 
 ## 7. Mark write surfaces clearly
 
@@ -125,6 +136,7 @@ Use the native `bin/axf.js` entry on PATH and standard CLI manifests.
 
 1. Add `axf.workspace.json`.
 2. Run `axf doctor` and confirm the project root is the repo, not a fallback.
-3. Use `axf run echo say --message hello` to confirm the core route.
-4. Add optional shared packs at machine or project scope if the repo wants them.
-5. Add repo-specific capabilities after the core route is working.
+3. Run `axf guide` and verify the declared workflow entrypoints.
+4. Use `axf run echo say --message hello` to confirm the core route.
+5. Add optional shared packs at machine or project scope if the repo wants them.
+6. Add repo-specific capabilities after the core route is working.

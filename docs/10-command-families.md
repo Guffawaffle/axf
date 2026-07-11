@@ -25,6 +25,7 @@ override.
   "commands": {
     "status": {
       "summary": "Show working tree status",
+      "recommendedFor": ["session-start"],
       "executionTarget": { "command": "git", "args": ["status"] },
       "args": {
         "porcelain": { "type": "boolean" },
@@ -86,7 +87,8 @@ the provider flag changes underneath.
 These public arg names are reserved by axf and rejected at family load:
 
 ```text
-json, workspace, any-lifecycle, allow-draft, include-drafts, all
+json, workspace, any-lifecycle, allow-draft, include-drafts, all,
+compact, search, side-effects, limit, intent
 ```
 
 If a provider uses these, expose them under a different public name and

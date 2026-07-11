@@ -37,6 +37,7 @@ Suggested baseline fields:
 - `defaults`
 - `policies`
 - `owner`
+- `recommendedFor` (optional workflow intents such as `session-start`, `validation`, or `handoff`)
 - `examples`
 
 ## Example capability manifest
@@ -64,7 +65,9 @@ Suggested baseline fields:
   "lifecycleState": "active",
   "defaults": {},
   "policies": [],
-  "owner": "module:echo"
+  "owner": "module:echo",
+  "recommendedFor": ["session-start"],
+  "examples": ["axf run echo say --message hello"]
 }
 ```
 

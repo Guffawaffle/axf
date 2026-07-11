@@ -238,6 +238,29 @@ execution root in this order:
 5. nearest `axf.workspace.json` from the installed script location
 6. `cwd` fallback
 
+### Agent-first discovery
+
+Start with the bounded workspace guide instead of requesting every full
+manifest:
+
+```sh
+axf guide
+axf guide context --json
+axf list --compact --search lex --limit 20 --json
+axf explain global.lex
+axf inspect global.lex.status --json
+```
+
+The MCP router exposes the same `guide`, compact/search `list`, `explain`, and
+`inspect` results. `guide` returns workspace- or family-declared context,
+validation, and handoff entrypoints without executing them. Compact list
+entries retain lifecycle, side effects, and source provenance while omitting
+full schemas and execution targets until `inspect`.
+
+See [Agent Discovery and Workflow Guide](docs/15-agent-discovery-and-workflow-guide.md)
+for recommendation declarations, missing-capability diagnostics, and CLI/MCP
+examples.
+
 When discovery and execution should use the same repo, set both
 `AXF_PROJECT_ROOT` and `AXF_EXECUTION_ROOT` to the same path. When they
 should differ, set them independently. Legacy `AXF_WORKSPACE` remains a

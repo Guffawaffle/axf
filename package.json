@@ -1,6 +1,6 @@
 {
   "name": "@smartergpt/axf",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": false,
   "type": "module",
   "description": "Agent eXoskeleton Framework control plane for workspace-native agent capabilities.",

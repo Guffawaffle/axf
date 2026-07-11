@@ -179,7 +179,16 @@ export class ManifestRegistry {
   }
 
   async loadLayer({ manifestsRoot, layerRoot, layer }) {
-    await this.loadFrom(manifestsRoot, { layerRoot, layer });
+    // Only AXF-owned manifest directories participate in discovery. Domain
+    // JSON elsewhere under manifests/ must not become false doctor errors.
+    await this.loadFrom(path.join(manifestsRoot, "capabilities"), {
+      layerRoot,
+      layer,
+    });
+    await this.loadFrom(path.join(manifestsRoot, "toolspaces"), {
+      layerRoot,
+      layer,
+    });
     await this.loadFamiliesFrom(path.join(manifestsRoot, "families"), {
       layerRoot,
       layer,

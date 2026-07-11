@@ -7,12 +7,12 @@
     "url": "https://github.com/Guffawaffle/axf",
     "source": "github"
   },
-  "version": "0.1.8",
+  "version": "1.1.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@smartergpt/axf",
-      "version": "0.1.8",
+      "version": "1.1.0",
       "transport": {
         "type": "stdio"
       },

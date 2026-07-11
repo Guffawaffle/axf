@@ -50,7 +50,7 @@ export const AXF_TOOL = {
       },
       target: {
         type: "object",
-        description: "Capability target for inspect or run.",
+        description: "Capability target for explain, inspect, or run.",
         properties: {
           id: { type: "string" },
           path: {
@@ -69,6 +69,42 @@ export const AXF_TOOL = {
       },
       allowAnyLifecycle: {
         type: "boolean",
+      },
+      compact: {
+        type: "boolean",
+        description:
+          "Return compact capability summaries instead of full manifests for operation=list.",
+      },
+      search: {
+        type: "string",
+        description:
+          "Filter operation=list by id, summary, provider, owner, family, or manifest source.",
+      },
+      sideEffects: {
+        type: "string",
+        enum: ["none", "read", "write", "network", "unknown"],
+      },
+      limit: {
+        type: "integer",
+        minimum: 1,
+        maximum: 100,
+        description: "Bound list or guide results.",
+      },
+      intent: {
+        type: "string",
+        enum: [
+          "context",
+          "session-start",
+          "check",
+          "validation",
+          "handoff",
+        ],
+        description: "Optional workflow intent filter for operation=guide.",
+      },
+      query: {
+        type: "string",
+        description:
+          "Capability id, family, prefix, or search term for operation=explain.",
       },
     },
   },

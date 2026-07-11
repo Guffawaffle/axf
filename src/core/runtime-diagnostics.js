@@ -63,10 +63,26 @@ export function summarizeWorkspaceBinding(registry, workspace, options = {}) {
       `project root marker missing at '${workspace.root}'; scout-style binding checks cannot anchor to this repo until axf.workspace.json exists`,
     );
   }
+  const allCapabilities = registry.listCapabilities({ includeDrafts: true });
+  const activeCapabilities = registry.listCapabilities({
+    includeDrafts: false,
+  });
   const projectManifestCount =
     registry.projectFiles?.length ?? registry.files.length;
   if (projectManifestCount === 0) {
-    notes.push(`project root '${workspace.root}' has no axf manifests yet`);
+    if (activeCapabilities.length > 0) {
+      const sourceKinds = new Set(
+        activeCapabilities.map(
+          (capability) =>
+            capability.layer ?? capability.provenance ?? "mounted/imported",
+        ),
+      );
+      notes.push(
+        `project root '${workspace.root}' has no local axf manifests; ${activeCapabilities.length} active ${[...sourceKinds].sort().join("/")} capabilities remain available`,
+      );
+    } else {
+      notes.push(`project root '${workspace.root}' has no local axf manifests yet`);
+    }
   }
 
   if (
@@ -78,10 +94,6 @@ export function summarizeWorkspaceBinding(registry, workspace, options = {}) {
     );
   }
 
-  const allCapabilities = registry.listCapabilities({ includeDrafts: true });
-  const activeCapabilities = registry.listCapabilities({
-    includeDrafts: false,
-  });
   if (allCapabilities.length === 0) {
     notes.push(`project root '${workspace.root}' has zero capabilities`);
   } else if (activeCapabilities.length === 0) {
