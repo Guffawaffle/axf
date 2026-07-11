@@ -6,5 +6,5 @@
   "summary": "STFC mod provider. Wraps the cli type-adapter and unwraps the STFC provider envelope into axf's normalized result shape.",
   "entry": "index.js",
   "lifecycleState": "reviewed",
-  "owner": "module:stfc-mod"
+  "owner": "module:stfc"
 }

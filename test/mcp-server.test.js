@@ -18,11 +18,13 @@ test("tools/list advertises exactly one tool named axf", async () => {
   assert.equal(response.tools[0].name, "axf");
   assert.equal(
     response.tools[0].description,
-    "AXF capability router. Use this single MCP tool to list, inspect, and run AXF capabilities. Capabilities such as global.lex.status are not separate MCP tools. Call with operation=help, list, inspect, run, doctor, or scout_check. Always inspect before run and respect lifecycle/sideEffects/policy metadata.",
+    "AXF capability router. Use this single MCP tool to guide, list, explain, inspect, and run AXF capabilities. Capabilities such as global.echo.say are not separate MCP tools. Prefer guide for bounded workflow entrypoints or list with compact/search for discovery. Always inspect before run, and use projectRoot/executionRoot when discovery and execution roots differ.",
   );
   assert.deepEqual(response.tools[0].inputSchema.properties.operation.enum, [
     "help",
     "list",
+    "guide",
+    "explain",
     "inspect",
     "run",
     "doctor",
@@ -47,7 +49,10 @@ test("tools/call help returns the single-tool router contract", async () => {
   assert.equal(response.structuredContent.ok, true);
   assert.equal(response.structuredContent.operation, "help");
   assert.equal(response.structuredContent.tool.name, "axf");
-  assert.equal(response.structuredContent.contract.capabilitiesAreSeparateTools, false);
+  assert.equal(
+    response.structuredContent.contract.capabilitiesAreSeparateTools,
+    false,
+  );
 });
 
 test("tools/call routes run through the single axf tool", async () => {
@@ -173,7 +178,9 @@ test("stdio MCP entrypoint accepts Content-Length input as legacy compatibility"
 });
 
 test("persistent MCP server reloads registry state between list calls", async () => {
-  const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "axf-mcp-refresh-"));
+  const workspaceRoot = await mkdtemp(
+    path.join(os.tmpdir(), "axf-mcp-refresh-"),
+  );
   await writeFile(
     path.join(workspaceRoot, "axf.workspace.json"),
     JSON.stringify({ manifestVersion: "axf/v0", name: "fixture" }),
@@ -210,12 +217,7 @@ test("persistent MCP server reloads registry state between list calls", async ()
     assert.equal(firstIds.includes(addedId), false);
 
     await writeFile(
-      path.join(
-        workspaceRoot,
-        "manifests",
-        "capabilities",
-        `${addedId}.json`,
-      ),
+      path.join(workspaceRoot, "manifests", "capabilities", `${addedId}.json`),
       `${JSON.stringify(
         {
           manifestVersion: "axf/v0",

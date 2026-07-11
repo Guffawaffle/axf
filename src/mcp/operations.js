@@ -4,14 +4,20 @@ import { prepareCommandInvocation } from "../core/command-invocation.js";
 import { inspectRegistry } from "../core/doctor.js";
 import { AxError } from "../core/errors.js";
 import { executeResolvedCapability } from "../core/executor.js";
-import { createRegistry } from "../core/registry.js";
+import { createRegistry, MACHINE_ROOT_ENV } from "../core/registry.js";
 import { resolveCapability } from "../core/resolver.js";
 import {
   collectRuntimeDiagnostics,
   summarizeWorkspaceBinding,
 } from "../core/runtime-diagnostics.js";
+import {
+  buildCapabilityExamples,
+  buildWorkflowGuide,
+  explainCapability,
+  selectCapabilities,
+} from "../core/discovery.js";
 import { scoutWorkspace } from "../core/scout.js";
-import { findWorkspaceRoot } from "../core/workspace.js";
+import { findWorkspacePair } from "../core/workspace.js";
 import {
   AXF_MCP_CAPABILITY_EXAMPLES,
   AXF_MCP_EXAMPLES,
@@ -47,6 +53,10 @@ export async function performOperation(rawInput, options = {}) {
         return performHelp(context);
       case "list":
         return performList(context);
+      case "guide":
+        return await performGuide(context);
+      case "explain":
+        return performExplain(context);
       case "inspect":
         return await performInspect(context);
       case "run":
@@ -88,11 +98,13 @@ function performHelp(context) {
           "AXF MCP exposes one tool named axf as an agent-safe router over the current AXF registry.",
         capabilitiesAreSeparateTools: false,
         routingNote:
-          "Capabilities such as global.lex.status and global.stfc-mod.status are discovered through the single axf MCP tool, not exposed as separate MCP tools.",
+          "Capabilities such as global.echo.say are discovered through the single axf MCP tool, not exposed as separate MCP tools.",
         capabilityExamples: AXF_MCP_CAPABILITY_EXAMPLES,
-        discoveryFlow: ["list", "inspect", "run"],
+        discoveryFlow: ["guide", "list", "explain", "inspect", "run"],
         runRules: [
           "Use operation=list to discover capabilities.",
+          "Prefer operation=guide for bounded workspace workflow entrypoints.",
+          "Use operation=explain when an expected capability is absent.",
           "Use operation=inspect before operation=run.",
           "Use operation=run only with args matching inspect output.",
           "Respect lifecycle, sideEffects, policies, and workspace binding.",
@@ -118,14 +130,30 @@ function performHelp(context) {
       operations: [
         {
           name: "help",
-          purpose: "Explain the single-tool AXF MCP contract and safe routing flow.",
+          purpose:
+            "Explain the single-tool AXF MCP contract and safe routing flow.",
           requiresTarget: false,
           readOnly: true,
         },
         {
           name: "list",
-          purpose: "Discover capabilities in the current AXF registry.",
+          purpose:
+            "Discover capabilities; compact/search filters avoid returning every full manifest.",
           requiresTarget: false,
+          readOnly: true,
+        },
+        {
+          name: "guide",
+          purpose:
+            "Return bounded workspace-declared context, validation, and handoff entrypoints.",
+          requiresTarget: false,
+          readOnly: true,
+        },
+        {
+          name: "explain",
+          purpose:
+            "Explain why a capability or family is available, filtered, or missing.",
+          requiresTarget: true,
           readOnly: true,
         },
         {
@@ -166,22 +194,71 @@ function performList(context) {
   const includeDrafts = Boolean(
     context.input.includeDrafts ?? context.input.allowAnyLifecycle,
   );
-  const capabilities = context.registry.listCapabilities({ includeDrafts });
+  const selection = selectCapabilities(context.registry, {
+    includeDrafts,
+    compact: Boolean(context.input.compact),
+    search: context.input.search,
+    sideEffects: context.input.sideEffects,
+    limit: context.input.limit ?? undefined,
+  });
 
   return attachWorkspace(
     {
       ok: true,
       operation: "list",
-      capabilities,
-      count: capabilities.length,
+      ...selection,
     },
+    context.workspaceSummary,
+  );
+}
+
+async function performGuide(context) {
+  let guide;
+  try {
+    guide = await buildWorkflowGuide(context.registry, {
+      projectRoot: context.registryWorkspace.root,
+      intent: context.input.intent,
+      limit: context.input.limit ?? undefined,
+    });
+  } catch (error) {
+    throw new MCPInputError(error.message);
+  }
+  return attachWorkspace(
+    { ok: true, operation: "guide", ...guide },
+    context.workspaceSummary,
+  );
+}
+
+function performExplain(context) {
+  const query = context.input.query ?? context.input.target;
+  if (!query) {
+    throw new MCPInputError(
+      "explain requires query or target.id/target.path",
+    );
+  }
+  const queryValue =
+    typeof query === "string"
+      ? query
+      : query.id
+        ? [query.id]
+        : query.path;
+  const explanation = explainCapability(context.registry, queryValue, {
+    includeDrafts: Boolean(
+      context.input.includeDrafts ?? context.input.allowAnyLifecycle,
+    ),
+    workspaceSummary: context.workspaceSummary,
+  });
+  return attachWorkspace(
+    { ok: true, operation: "explain", ...explanation },
     context.workspaceSummary,
   );
 }
 
 async function performInspect(context) {
   const targetTokens = resolveTargetTokens(context.input.target, "inspect");
-  const adapters = await loadAdapters({ rootDir: context.workspace.root });
+  const adapters = await loadAdapters({
+    rootDir: context.registryWorkspace.root,
+  });
   const resolved = context.registry.resolveInspectable(targetTokens);
   const capability = resolved.capability;
   const launchPlan =
@@ -201,6 +278,7 @@ async function performInspect(context) {
     ok: true,
     operation: "inspect",
     ...resolved,
+    examples: buildCapabilityExamples(capability),
   };
 
   if (launchPlan) {
@@ -226,10 +304,13 @@ async function performInspect(context) {
 }
 
 async function performDoctor(context) {
-  const adapters = await loadAdapters({ rootDir: context.workspace.root });
+  const adapters = await loadAdapters({
+    rootDir: context.registryWorkspace.root,
+  });
   const report = inspectRegistry(context.registry, { adapters });
   const runtimeDiagnostics = collectRuntimeDiagnostics(context.registry, {
-    workspace: context.workspace,
+    workspace: context.registryWorkspace,
+    executionWorkspace: context.executionWorkspace,
     env: context.env,
     cwd: context.cwd,
     platform: context.runtime.platform,
@@ -248,17 +329,24 @@ async function performDoctor(context) {
     adapterCount: report.adapterCount,
     adaptersByType: report.adaptersByType,
     familyCount: report.familyCount,
+    families: report.families,
+    shadowedFamilies: report.shadowedFamilies,
+    familyConflicts: report.familyConflicts,
     drift: report.drift,
     issues,
     runtime: runtimeDiagnostics.runtime,
+    projectRoot: context.workspaceSummary.projectRoot,
+    executionRoot: context.workspaceSummary.executionRoot,
     workspace: context.workspaceSummary.workspace,
+    executionWorkspace: context.workspaceSummary.executionWorkspace,
+    workspaces: context.workspaceSummary.workspaces,
     notes: context.workspaceSummary.notes,
   };
 }
 
 async function performScoutCheck(context) {
   const report = await scoutWorkspace({
-    rootDir: context.workspace.root,
+    rootDir: context.registryWorkspace.root,
     check: false,
     write: false,
     env: context.env,
@@ -284,7 +372,9 @@ async function performScoutCheck(context) {
 
 async function performRun(context) {
   const targetTokens = resolveTargetTokens(context.input.target, "run");
-  const adapters = await loadAdapters({ rootDir: context.workspace.root });
+  const adapters = await loadAdapters({
+    rootDir: context.registryWorkspace.root,
+  });
   const resolved = resolveCapability(context.registry, targetTokens, {
     args: context.input.args ?? {},
     allowDraft: Boolean(context.input.allowAnyLifecycle),
@@ -309,8 +399,7 @@ async function performRun(context) {
               execution.meta?.policyErrors?.length > 0
                 ? "EXECUTION_BLOCKED"
                 : "EXECUTION_FAILED",
-            message:
-              execution.error?.message ?? "capability execution failed",
+            message: execution.error?.message ?? "capability execution failed",
           },
       meta: execution.meta ?? null,
     },
@@ -321,39 +410,71 @@ async function performRun(context) {
 async function createContext(input, options) {
   const cwd = options.cwd ?? process.cwd();
   const env = options.env ?? process.env;
-  const workspace = findWorkspaceRoot({
+  const workspaces = findWorkspacePair({
     cwd,
     env,
     explicit: input.workspace ?? undefined,
+    registryExplicit: input.projectRoot ?? input.registryWorkspace ?? undefined,
+    executionExplicit:
+      input.executionRoot ?? input.executionWorkspace ?? undefined,
   });
   const registry = await createRegistry({
-    rootDir: workspace.root,
-    enableFrameworkGlobals: workspace.viaMarker,
+    rootDir: workspaces.registryWorkspace.root,
+    enableFrameworkGlobals: workspaces.registryWorkspace.viaMarker,
+    machineRoot: env[MACHINE_ROOT_ENV],
   });
-  const workspaceSummary = summarizeWorkspaceBinding(registry, workspace, {
-    cwd,
-  });
+  const workspaceSummary = summarizeWorkspaceBinding(
+    registry,
+    workspaces.registryWorkspace,
+    {
+      cwd,
+      executionWorkspace: workspaces.executionWorkspace,
+    },
+  );
 
   return {
     input,
     cwd,
     env,
-    workspace,
+    workspace: workspaces.registryWorkspace,
+    registryWorkspace: workspaces.registryWorkspace,
+    executionWorkspace: workspaces.executionWorkspace,
+    workspaces,
     workspaceSummary,
     registry,
-    runtime: buildRuntime(workspace, env, cwd),
+    runtime: buildRuntime(workspaces, env, cwd),
   };
 }
 
-function buildRuntime(workspace, env, cwd) {
+function buildRuntime(workspaces, env, cwd) {
   return {
     cwd,
     env,
     platform: process.platform,
+    projectRoot: {
+      root: workspaces.registryWorkspace.root,
+      viaMarker: workspaces.registryWorkspace.viaMarker,
+      source: workspaces.registryWorkspace.source,
+    },
+    registryWorkspace: {
+      root: workspaces.registryWorkspace.root,
+      viaMarker: workspaces.registryWorkspace.viaMarker,
+      source: workspaces.registryWorkspace.source,
+    },
+    executionRoot: {
+      root: workspaces.executionWorkspace.root,
+      viaMarker: workspaces.executionWorkspace.viaMarker,
+      source: workspaces.executionWorkspace.source,
+    },
+    executionWorkspace: {
+      root: workspaces.executionWorkspace.root,
+      viaMarker: workspaces.executionWorkspace.viaMarker,
+      source: workspaces.executionWorkspace.source,
+    },
     workspace: {
-      root: workspace.root,
-      viaMarker: workspace.viaMarker,
-      source: workspace.source,
+      root: workspaces.executionWorkspace.root,
+      viaMarker: workspaces.executionWorkspace.viaMarker,
+      source: workspaces.executionWorkspace.source,
     },
   };
 }
@@ -410,6 +531,16 @@ function validateInput(value) {
   }
 
   const workspace = optionalString(value.workspace, "workspace");
+  const projectRoot = optionalString(value.projectRoot, "projectRoot");
+  const registryWorkspace = optionalString(
+    value.registryWorkspace,
+    "registryWorkspace",
+  );
+  const executionRoot = optionalString(value.executionRoot, "executionRoot");
+  const executionWorkspace = optionalString(
+    value.executionWorkspace,
+    "executionWorkspace",
+  );
   const target = validateTarget(value.target, value.operation);
   const args = validateArgs(value.args);
   const includeDrafts = optionalBoolean(value.includeDrafts, "includeDrafts");
@@ -417,14 +548,30 @@ function validateInput(value) {
     value.allowAnyLifecycle,
     "allowAnyLifecycle",
   );
+  const compact = optionalBoolean(value.compact, "compact");
+  const search = optionalString(value.search, "search");
+  const sideEffects = optionalString(value.sideEffects, "sideEffects");
+  const intent = optionalString(value.intent, "intent");
+  const query = optionalString(value.query, "query");
+  const limit = optionalInteger(value.limit, "limit", { min: 1, max: 100 });
 
   return {
     operation: value.operation,
     workspace,
+    projectRoot,
+    registryWorkspace,
+    executionRoot,
+    executionWorkspace,
     target,
     args,
     includeDrafts,
     allowAnyLifecycle,
+    compact,
+    search,
+    sideEffects,
+    intent,
+    query,
+    limit,
   };
 }
 
@@ -506,10 +653,24 @@ function optionalBoolean(value, label) {
   return value;
 }
 
+function optionalInteger(value, label, { min, max }) {
+  if (value === undefined) return null;
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new MCPInputError(
+      `${label} must be an integer between ${min} and ${max}`,
+    );
+  }
+  return value;
+}
+
 function attachWorkspace(payload, workspaceSummary) {
   return {
     ...payload,
+    projectRoot: workspaceSummary?.projectRoot ?? null,
+    executionRoot: workspaceSummary?.executionRoot ?? null,
     workspace: workspaceSummary?.workspace ?? null,
+    executionWorkspace: workspaceSummary?.executionWorkspace ?? null,
+    workspaces: workspaceSummary?.workspaces ?? null,
     notes: workspaceSummary?.notes ?? [],
   };
 }
@@ -554,7 +715,9 @@ function classifyError(error) {
     return error.code;
   }
 
-  if (/unknown capability|unknown mount|mount source capability/.test(message)) {
+  if (
+    /unknown capability|unknown mount|mount source capability/.test(message)
+  ) {
     return "UNKNOWN_CAPABILITY";
   }
   if (/capability '.*' args:/.test(message)) {
@@ -581,8 +744,8 @@ function buildOperationSelectionErrorDetails() {
       ),
       createNextStep(
         "call_list",
-        "Call operation=list to discover capability ids in the bound AXF registry.",
-        { operation: "list" },
+        "Call compact operation=list to discover capability ids in the bound AXF registry.",
+        { operation: "list", compact: true, limit: 20 },
       ),
       createNextStep(
         "inspect_before_run",
@@ -617,8 +780,8 @@ function buildRunDiscoveryNextSteps() {
   return [
     createNextStep(
       "call_list",
-      "Call operation=list to discover capability ids.",
-      { operation: "list" },
+      "Call compact operation=list to discover capability ids.",
+      { operation: "list", compact: true, limit: 20 },
     ),
     createNextStep(
       "inspect_before_run",
@@ -628,7 +791,7 @@ function buildRunDiscoveryNextSteps() {
   ];
 }
 
-function createInspectExample(id = "global.lex.status") {
+function createInspectExample(id = "global.echo.say") {
   return {
     operation: "inspect",
     target: { id },

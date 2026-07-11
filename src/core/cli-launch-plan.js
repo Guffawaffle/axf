@@ -122,7 +122,7 @@ export function resolveCliLaunchPlan(
 function resolveWorkingDirectory(cwdSpec, capabilityId, runtime) {
   const processCwd = runtime?.cwd ?? process.cwd();
   if (cwdSpec === undefined) {
-    const workspaceRoot = runtime?.workspace?.root;
+    const workspaceRoot = getExecutionWorkspaceRoot(runtime);
     if (workspaceRoot) {
       return { path: path.resolve(workspaceRoot), source: "workspace" };
     }
@@ -177,7 +177,7 @@ function resolveCwdPath(
   }
 
   if (relativeTo === "workspace") {
-    const workspaceRoot = runtime?.workspace?.root;
+    const workspaceRoot = getExecutionWorkspaceRoot(runtime);
     if (!workspaceRoot) {
       throw new AxError(
         `cli capability '${capabilityId}' requires a bound workspace to resolve executionTarget.cwd relativeTo='workspace'`,
@@ -366,7 +366,7 @@ function resolveRelativeRoot(
   contextLabel,
 ) {
   if (relativeTo === WORKSPACE_RELATIVE) {
-    const workspaceRoot = runtime?.workspace?.root;
+    const workspaceRoot = getRegistryWorkspaceRoot(runtime);
     if (!workspaceRoot) {
       throw new AxError(
         `cli capability '${capabilityId}' requires a bound workspace to resolve ${contextLabel}='${relativeTo}'`,
@@ -395,4 +395,22 @@ function normalizeStringArray(value, label) {
     throw new AxError(`${label} must be an array of strings`, 2);
   }
   return value;
+}
+
+function getExecutionWorkspaceRoot(runtime) {
+  return (
+    runtime?.executionRoot?.root ??
+    runtime?.executionWorkspace?.root ??
+    runtime?.workspace?.root ??
+    null
+  );
+}
+
+function getRegistryWorkspaceRoot(runtime) {
+  return (
+    runtime?.projectRoot?.root ??
+    runtime?.registryWorkspace?.root ??
+    runtime?.workspace?.root ??
+    null
+  );
 }

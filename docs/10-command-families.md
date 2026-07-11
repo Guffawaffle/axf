@@ -25,6 +25,7 @@ override.
   "commands": {
     "status": {
       "summary": "Show working tree status",
+      "recommendedFor": ["session-start"],
       "executionTarget": { "command": "git", "args": ["status"] },
       "args": {
         "porcelain": { "type": "boolean" },
@@ -40,10 +41,31 @@ family with `scope: "global"`, command `status` becomes capability
 `global.git.status`. Synthesized capabilities carry:
 
 - `origin: "imported"`
-- `sourceFamily: { family, command, manifestPath }`
+- `sourceFamily: { family, command, manifestPath, layer }`
 - `argMap: { <publicName>: <providerFlag> }`
 
 Run `axf inspect global.git.status` to see all of these.
+
+## Family identity and layer precedence
+
+The `family` name is semantic identity. It should not encode where the
+manifest was stored.
+
+When AXF discovers the same family name at multiple layers, the narrower
+layer wins:
+
+1. project root
+2. machine-level AXF root (`AXF_MACHINE_ROOT`)
+3. framework built-ins
+
+Same-name families at the same layer are a conflict. AXF reports them in
+doctor diagnostics and does not synthesize commands for the ambiguous
+family.
+
+Shadowing is whole-family shadowing. If a project defines `family:
+"git"`, that project family replaces a machine-level `git` family for
+that project. To override just one command, materialize that command
+instead of renaming the family.
 
 ## Public-to-provider arg mapping
 
@@ -65,7 +87,8 @@ the provider flag changes underneath.
 These public arg names are reserved by axf and rejected at family load:
 
 ```text
-json, workspace, any-lifecycle, allow-draft, include-drafts, all
+json, workspace, any-lifecycle, allow-draft, include-drafts, all,
+compact, search, side-effects, limit, intent
 ```
 
 If a provider uses these, expose them under a different public name and

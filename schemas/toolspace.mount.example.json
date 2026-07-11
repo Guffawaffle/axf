@@ -3,11 +3,11 @@
   "toolspace": "awa",
   "lifecycleState": "active",
   "moduleMounts": {
-    "lex": {
-      "source": "global.lex",
+    "echo": {
+      "source": "global.echo",
       "mode": "proxy",
-      "capabilities": ["frame.recall", "frame.write", "receipt.show"],
-      "defaults": { "namespace": "awa" },
+      "capabilities": ["say"],
+      "defaults": { "prefix": "awa" },
       "policies": ["require_workspace_binding"]
     }
   }

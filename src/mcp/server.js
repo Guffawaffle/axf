@@ -23,13 +23,34 @@ export const AXF_TOOL = {
         type: "string",
         enum: AXF_MCP_OPERATIONS,
       },
+      projectRoot: {
+        type: "string",
+        description:
+          "Canonical AXF project root override for manifest and adapter discovery.",
+      },
+      executionRoot: {
+        type: "string",
+        description:
+          "Canonical AXF execution root override for runtime cwd and caller-facing execution.",
+      },
       workspace: {
         type: "string",
-        description: "Optional AXF workspace root override.",
+        description:
+          "Legacy AXF workspace root override that sets both project and execution roots.",
+      },
+      registryWorkspace: {
+        type: "string",
+        description:
+          "Legacy AXF registry workspace override for manifest and adapter discovery.",
+      },
+      executionWorkspace: {
+        type: "string",
+        description:
+          "Legacy AXF execution workspace override for runtime cwd and caller-facing execution.",
       },
       target: {
         type: "object",
-        description: "Capability target for inspect or run.",
+        description: "Capability target for explain, inspect, or run.",
         properties: {
           id: { type: "string" },
           path: {
@@ -48,6 +69,42 @@ export const AXF_TOOL = {
       },
       allowAnyLifecycle: {
         type: "boolean",
+      },
+      compact: {
+        type: "boolean",
+        description:
+          "Return compact capability summaries instead of full manifests for operation=list.",
+      },
+      search: {
+        type: "string",
+        description:
+          "Filter operation=list by id, summary, provider, owner, family, or manifest source.",
+      },
+      sideEffects: {
+        type: "string",
+        enum: ["none", "read", "write", "network", "unknown"],
+      },
+      limit: {
+        type: "integer",
+        minimum: 1,
+        maximum: 100,
+        description: "Bound list or guide results.",
+      },
+      intent: {
+        type: "string",
+        enum: [
+          "context",
+          "session-start",
+          "check",
+          "validation",
+          "handoff",
+        ],
+        description: "Optional workflow intent filter for operation=guide.",
+      },
+      query: {
+        type: "string",
+        description:
+          "Capability id, family, prefix, or search term for operation=explain.",
       },
     },
   },

@@ -7,12 +7,12 @@
     "url": "https://github.com/Guffawaffle/axf",
     "source": "github"
   },
-  "version": "0.1.8",
+  "version": "1.1.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@smartergpt/axf",
-      "version": "0.1.8",
+      "version": "1.1.0",
       "transport": {
         "type": "stdio"
       },
@@ -25,8 +25,36 @@
       ],
       "environmentVariables": [
         {
+          "name": "AXF_PROJECT_ROOT",
+          "description": "Canonical AXF project root for manifest and adapter discovery. Defaults to current working directory when no marker is found.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "AXF_EXECUTION_ROOT",
+          "description": "Canonical AXF execution root for runtime cwd and caller-facing execution. Defaults to current working directory.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
           "name": "AXF_WORKSPACE",
-          "description": "Root directory for the AXF workspace. Defaults to current working directory.",
+          "description": "Legacy alias that sets both the AXF project root and execution root.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "AXF_REGISTRY_WORKSPACE",
+          "description": "Legacy alias for AXF_PROJECT_ROOT.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "AXF_EXECUTION_WORKSPACE",
+          "description": "Legacy alias for AXF_EXECUTION_ROOT.",
           "isRequired": false,
           "format": "string",
           "isSecret": false

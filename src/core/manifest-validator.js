@@ -143,6 +143,36 @@ export function validateCapabilityManifest(manifest, label) {
     });
   }
 
+  if (manifest.recommendedFor !== undefined) {
+    const entries = Array.isArray(manifest.recommendedFor)
+      ? manifest.recommendedFor
+      : [manifest.recommendedFor];
+    if (
+      entries.length === 0 ||
+      entries.some((entry) => typeof entry !== "string" || entry.length === 0)
+    ) {
+      issues.push({
+        severity: "error",
+        message: `${label}: recommendedFor must be a string or non-empty string array`,
+      });
+    }
+  }
+
+  if (
+    manifest.examples !== undefined &&
+    (!Array.isArray(manifest.examples) ||
+      manifest.examples.some(
+        (example) =>
+          typeof example !== "string" &&
+          (example === null || typeof example !== "object" || Array.isArray(example)),
+      ))
+  ) {
+    issues.push({
+      severity: "error",
+      message: `${label}: examples must be an array of strings or objects`,
+    });
+  }
+
   if (
     manifest.argsSchema &&
     (typeof manifest.argsSchema !== "object" ||

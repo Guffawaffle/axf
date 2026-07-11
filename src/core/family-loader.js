@@ -36,7 +36,12 @@ const SUPPORTED_ARG_STYLES = new Set([
 const SUPPORTED_SCOPES = new Set(["global", "workspace-local"]);
 const LIFECYCLE_ALIASES = new Map([["stable", "active"]]);
 
-const DESCRIPTIVE_METADATA_KEYS = ["warnings", "details"];
+const DESCRIPTIVE_METADATA_KEYS = [
+  "warnings",
+  "details",
+  "examples",
+  "recommendedFor",
+];
 
 // Args the framework reserves for itself. A family or capability that
 // declares one of these as a public arg is rejected, because the CLI
@@ -48,6 +53,11 @@ export const RESERVED_ARG_NAMES = new Set([
   "allow-draft",
   "include-drafts",
   "all",
+  "compact",
+  "search",
+  "side-effects",
+  "limit",
+  "intent",
 ]);
 
 export async function loadFamilies({ familiesRoot, rootDir }) {
@@ -151,6 +161,7 @@ function normalizeFamilyManifest(manifest, label) {
     });
     normalized.lifecycleState = familyLifecycle;
   }
+  validateRecommendedFor(normalized.recommendedFor, label, issues);
 
   if (
     !normalized.commands ||
@@ -193,8 +204,27 @@ function normalizeFamilyManifest(manifest, label) {
         }
       }
     }
+    validateRecommendedFor(
+      cmd.recommendedFor,
+      `${label}: command '${cmdKey}'`,
+      issues,
+    );
   }
   return { manifest: normalized, issues };
+}
+
+function validateRecommendedFor(value, label, issues) {
+  if (value === undefined) return;
+  const entries = Array.isArray(value) ? value : [value];
+  if (
+    entries.length === 0 ||
+    entries.some((entry) => typeof entry !== "string" || entry.length === 0)
+  ) {
+    issues.push({
+      severity: "error",
+      message: `${label}: recommendedFor must be a string or non-empty string array`,
+    });
+  }
 }
 
 // Build the capability records the registry exposes for a family.
@@ -231,9 +261,11 @@ export function synthesizeFamilyCapabilities(
         family: family.family,
         command: cmdKey,
         manifestPath: family.manifestPath,
+        layer: family.layer,
       },
       manifestPath: family.manifestPath,
       origin,
+      layer: family.layer,
       provenance: family.provenance,
     };
     copyDescriptiveMetadata(capability, cmd);

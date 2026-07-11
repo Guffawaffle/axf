@@ -11,61 +11,108 @@ const OBSERVED_COMMANDS = ["axf", "lex", "node", "npm"];
 export const DOCUMENTED_NATIVE_AXF_PATH = "/srv/axf/bin/axf.js";
 
 export function summarizeWorkspaceBinding(registry, workspace, options = {}) {
-  const { cwd = process.cwd() } = options;
+  const { cwd = process.cwd(), executionWorkspace = null } = options;
   if (!workspace) {
-    return { workspace: null, notes: [] };
+    return {
+      projectRoot: null,
+      executionRoot: executionWorkspace
+        ? summarizeWorkspace(executionWorkspace)
+        : null,
+      workspace: null,
+      executionWorkspace: executionWorkspace
+        ? summarizeWorkspace(executionWorkspace)
+        : null,
+      workspaces: {
+        projectRoot: null,
+        executionRoot: executionWorkspace
+          ? summarizeWorkspace(executionWorkspace)
+          : null,
+        registryWorkspace: null,
+        executionWorkspace: executionWorkspace
+          ? summarizeWorkspace(executionWorkspace)
+          : null,
+      },
+      notes: [],
+    };
   }
 
-  const workspaceSummary = {
-    root: workspace.root,
-    source: workspace.source,
-    viaMarker: workspace.viaMarker,
-    markerPath: path.join(workspace.root, "axf.workspace.json"),
-    markerPresent:
-      workspace.viaMarker ||
-      existsSync(path.join(workspace.root, "axf.workspace.json")),
-  };
+  const workspaceSummary = summarizeWorkspace(workspace);
+  const executionWorkspaceSummary = executionWorkspace
+    ? summarizeWorkspace(executionWorkspace)
+    : null;
 
   const notes = [];
   if (workspace.source === "script-marker") {
     notes.push(
-      `current directory '${cwd}' is not bound to an axf workspace; using '${workspace.root}' from the installed axf location instead`,
+      `current directory '${cwd}' is not bound to an axf project root; using '${workspace.root}' from the installed axf location instead`,
     );
   }
   if (workspace.source === "cwd-fallback") {
     notes.push(
-      `no axf.workspace.json was found from '${cwd}'; axf is treating '${workspace.root}' as a best-effort workspace`,
+      `no axf.workspace.json was found from '${cwd}'; axf is treating '${workspace.root}' as a best-effort project root`,
     );
     notes.push(
-      `workspace marker missing at '${workspace.root}'; scout-style binding checks cannot anchor to this repo until axf.workspace.json exists`,
+      `project root marker missing at '${workspace.root}'; scout-style binding checks cannot anchor to this repo until axf.workspace.json exists`,
     );
   }
   if (workspace.source === "explicit" && !workspaceSummary.markerPresent) {
     notes.push(
-      `explicit workspace '${workspace.root}' does not contain axf.workspace.json`,
+      `explicit project root '${workspace.root}' does not contain axf.workspace.json`,
     );
     notes.push(
-      `workspace marker missing at '${workspace.root}'; scout-style binding checks cannot anchor to this repo until axf.workspace.json exists`,
+      `project root marker missing at '${workspace.root}'; scout-style binding checks cannot anchor to this repo until axf.workspace.json exists`,
     );
   }
-  if (registry.files.length === 0) {
-    notes.push(`workspace '${workspace.root}' has no axf manifests yet`);
-  }
-
   const allCapabilities = registry.listCapabilities({ includeDrafts: true });
   const activeCapabilities = registry.listCapabilities({
     includeDrafts: false,
   });
+  const projectManifestCount =
+    registry.projectFiles?.length ?? registry.files.length;
+  if (projectManifestCount === 0) {
+    if (activeCapabilities.length > 0) {
+      const sourceKinds = new Set(
+        activeCapabilities.map(
+          (capability) =>
+            capability.layer ?? capability.provenance ?? "mounted/imported",
+        ),
+      );
+      notes.push(
+        `project root '${workspace.root}' has no local axf manifests; ${activeCapabilities.length} active ${[...sourceKinds].sort().join("/")} capabilities remain available`,
+      );
+    } else {
+      notes.push(`project root '${workspace.root}' has no local axf manifests yet`);
+    }
+  }
+
+  if (
+    executionWorkspaceSummary &&
+    executionWorkspaceSummary.root !== workspaceSummary.root
+  ) {
+    notes.push(
+      `project root '${workspaceSummary.root}' differs from execution root '${executionWorkspaceSummary.root}'`,
+    );
+  }
+
   if (allCapabilities.length === 0) {
-    notes.push(`workspace '${workspace.root}' has zero capabilities`);
+    notes.push(`project root '${workspace.root}' has zero capabilities`);
   } else if (activeCapabilities.length === 0) {
     notes.push(
-      `workspace '${workspace.root}' has no active capabilities; pass --any-lifecycle to include drafts`,
+      `project root '${workspace.root}' has no active capabilities; pass --any-lifecycle to include drafts`,
     );
   }
 
   return {
+    projectRoot: workspaceSummary,
+    executionRoot: executionWorkspaceSummary,
     workspace: workspaceSummary,
+    executionWorkspace: executionWorkspaceSummary,
+    workspaces: {
+      projectRoot: workspaceSummary,
+      executionRoot: executionWorkspaceSummary,
+      registryWorkspace: workspaceSummary,
+      executionWorkspace: executionWorkspaceSummary,
+    },
     notes,
   };
 }
@@ -73,6 +120,7 @@ export function summarizeWorkspaceBinding(registry, workspace, options = {}) {
 export function collectRuntimeDiagnostics(registry, options = {}) {
   const {
     workspace = null,
+    executionWorkspace = null,
     env = process.env,
     platform = process.platform,
     osRelease = os.release(),
@@ -146,11 +194,49 @@ export function collectRuntimeDiagnostics(registry, options = {}) {
   const runtimeContext = workspace
     ? {
         cwd,
-        workspace: {
+        projectRoot: {
           root: workspace.root,
           viaMarker: workspace.viaMarker,
           source: workspace.source,
         },
+        registryWorkspace: {
+          root: workspace.root,
+          viaMarker: workspace.viaMarker,
+          source: workspace.source,
+        },
+        executionRoot: executionWorkspace
+          ? {
+              root: executionWorkspace.root,
+              viaMarker: executionWorkspace.viaMarker,
+              source: executionWorkspace.source,
+            }
+          : {
+              root: workspace.root,
+              viaMarker: workspace.viaMarker,
+              source: workspace.source,
+            },
+        executionWorkspace: executionWorkspace
+          ? {
+              root: executionWorkspace.root,
+              viaMarker: executionWorkspace.viaMarker,
+              source: executionWorkspace.source,
+            }
+          : {
+              root: workspace.root,
+              viaMarker: workspace.viaMarker,
+              source: workspace.source,
+            },
+        workspace: executionWorkspace
+          ? {
+              root: executionWorkspace.root,
+              viaMarker: executionWorkspace.viaMarker,
+              source: executionWorkspace.source,
+            }
+          : {
+              root: workspace.root,
+              viaMarker: workspace.viaMarker,
+              source: workspace.source,
+            },
       }
     : { cwd };
   const seen = new Set();
@@ -194,6 +280,18 @@ export function collectRuntimeDiagnostics(registry, options = {}) {
   }
 
   return { runtime, issues };
+}
+
+function summarizeWorkspace(workspace) {
+  return {
+    root: workspace.root,
+    source: workspace.source,
+    viaMarker: workspace.viaMarker,
+    markerPath: path.join(workspace.root, "axf.workspace.json"),
+    markerPresent:
+      workspace.viaMarker ||
+      existsSync(path.join(workspace.root, "axf.workspace.json")),
+  };
 }
 
 function isWslEnvironment({ env, platform, osRelease }) {

@@ -1,11 +1,11 @@
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
-import { createRegistry } from "../core/registry.js";
+import { createRegistry, MACHINE_ROOT_ENV } from "../core/registry.js";
 import { resolveCapability } from "../core/resolver.js";
 import { executeResolvedCapability } from "../core/executor.js";
 import { inspectRegistry } from "../core/doctor.js";
 import { loadAdapters } from "../core/adapter-loader.js";
-import { findWorkspaceRoot } from "../core/workspace.js";
+import { findWorkspacePair } from "../core/workspace.js";
 import { parseOptionTokens, splitCommandTokens } from "./options.js";
 import { AxError } from "../core/errors.js";
 import { resolveCliLaunchPlan } from "../core/cli-launch-plan.js";
@@ -16,9 +16,18 @@ import {
   collectRuntimeDiagnostics,
   summarizeWorkspaceBinding,
 } from "../core/runtime-diagnostics.js";
+import {
+  buildCapabilityExamples,
+  buildWorkflowGuide,
+  explainCapability,
+  normalizeDiscoveryLimit,
+  selectCapabilities,
+} from "../core/discovery.js";
 
 const COMMANDS = new Set([
   "list",
+  "guide",
+  "explain",
   "inspect",
   "run",
   "init",
@@ -36,13 +45,22 @@ export async function main(argv, env = {}) {
 
   // Pull --workspace out of argv before command dispatch so every
   // subcommand gets workspace resolution for free.
-  const { argv: rest1, workspace } = extractWorkspaceFlag(argv);
-  const ws = findWorkspaceRoot({
+  const {
+    argv: rest1,
+    workspace,
+    registryWorkspace,
+    executionWorkspace,
+    projectRoot,
+    executionRoot,
+  } = extractWorkspaceFlags(argv);
+  const workspaces = findWorkspacePair({
     cwd,
     env: processEnv,
     explicit: workspace,
+    registryExplicit: projectRoot ?? registryWorkspace,
+    executionExplicit: executionRoot ?? executionWorkspace,
   });
-  const rootDir = ws.root;
+  const rootDir = workspaces.registryWorkspace.root;
 
   const [command = "help", ...rest] = rest1;
 
@@ -64,30 +82,60 @@ export async function main(argv, env = {}) {
     return;
   }
   if (command === "mcp") {
-    const serverEnv = workspace
-      ? { ...processEnv, AXF_WORKSPACE: ws.root }
-      : processEnv;
+    const serverEnv = { ...processEnv };
+    if (workspace) {
+      serverEnv.AXF_PROJECT_ROOT = workspaces.registryWorkspace.root;
+      serverEnv.AXF_EXECUTION_ROOT = workspaces.executionWorkspace.root;
+      serverEnv.AXF_WORKSPACE = workspaces.registryWorkspace.root;
+      serverEnv.AXF_REGISTRY_WORKSPACE = workspaces.registryWorkspace.root;
+      serverEnv.AXF_EXECUTION_WORKSPACE = workspaces.executionWorkspace.root;
+    }
+    if (registryWorkspace) {
+      serverEnv.AXF_PROJECT_ROOT = workspaces.registryWorkspace.root;
+      serverEnv.AXF_REGISTRY_WORKSPACE = workspaces.registryWorkspace.root;
+    }
+    if (projectRoot) {
+      serverEnv.AXF_PROJECT_ROOT = workspaces.registryWorkspace.root;
+      serverEnv.AXF_REGISTRY_WORKSPACE = workspaces.registryWorkspace.root;
+    }
+    if (executionWorkspace) {
+      serverEnv.AXF_EXECUTION_ROOT = workspaces.executionWorkspace.root;
+      serverEnv.AXF_EXECUTION_WORKSPACE = workspaces.executionWorkspace.root;
+    }
+    if (executionRoot) {
+      serverEnv.AXF_EXECUTION_ROOT = workspaces.executionWorkspace.root;
+      serverEnv.AXF_EXECUTION_WORKSPACE = workspaces.executionWorkspace.root;
+    }
     startStdioServer({ cwd, env: serverEnv });
     return;
   }
 
   const registry = await createRegistry({
     rootDir,
-    enableFrameworkGlobals: ws.viaMarker,
+    enableFrameworkGlobals: workspaces.registryWorkspace.viaMarker,
+    machineRoot: processEnv[MACHINE_ROOT_ENV],
   });
 
   if (command === "list") {
-    await listCommand(registry, rest, ws, { cwd });
+    await listCommand(registry, rest, workspaces, { cwd });
+    return;
+  }
+  if (command === "guide") {
+    await guideCommand(registry, rest, workspaces, { cwd });
+    return;
+  }
+  if (command === "explain") {
+    await explainCommand(registry, rest, workspaces, { cwd });
     return;
   }
   if (command === "inspect") {
     const adapters = await loadAdapters({ rootDir });
-    await inspectCommand(registry, adapters, rest, ws, processEnv, cwd);
+    await inspectCommand(registry, adapters, rest, workspaces, processEnv, cwd);
     return;
   }
   if (command === "run") {
     const adapters = await loadAdapters({ rootDir });
-    await runCommand(registry, adapters, rest, ws, processEnv, cwd);
+    await runCommand(registry, adapters, rest, workspaces, processEnv, cwd);
     return;
   }
   if (command === "promote") {
@@ -100,15 +148,19 @@ export async function main(argv, env = {}) {
   }
   if (command === "doctor") {
     const adapters = await loadAdapters({ rootDir });
-    await doctorCommand(registry, adapters, rest, ws, processEnv, cwd);
+    await doctorCommand(registry, adapters, rest, workspaces, processEnv, cwd);
   }
 }
 
 // Extract `--workspace <path>` or `--workspace=<path>` from argv before
 // command dispatch. Other flags pass through untouched.
-function extractWorkspaceFlag(argv) {
+function extractWorkspaceFlags(argv) {
   const out = [];
   let workspace = null;
+  let registryWorkspace = null;
+  let executionWorkspace = null;
+  let projectRoot = null;
+  let executionRoot = null;
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
     if (token === "--workspace") {
@@ -120,15 +172,58 @@ function extractWorkspaceFlag(argv) {
       workspace = token.slice("--workspace=".length);
       continue;
     }
+    if (token === "--registry-workspace") {
+      registryWorkspace = argv[i + 1];
+      i += 1;
+      continue;
+    }
+    if (token.startsWith("--registry-workspace=")) {
+      registryWorkspace = token.slice("--registry-workspace=".length);
+      continue;
+    }
+    if (token === "--execution-workspace") {
+      executionWorkspace = argv[i + 1];
+      i += 1;
+      continue;
+    }
+    if (token.startsWith("--execution-workspace=")) {
+      executionWorkspace = token.slice("--execution-workspace=".length);
+      continue;
+    }
+    if (token === "--project-root") {
+      projectRoot = argv[i + 1];
+      i += 1;
+      continue;
+    }
+    if (token.startsWith("--project-root=")) {
+      projectRoot = token.slice("--project-root=".length);
+      continue;
+    }
+    if (token === "--execution-root") {
+      executionRoot = argv[i + 1];
+      i += 1;
+      continue;
+    }
+    if (token.startsWith("--execution-root=")) {
+      executionRoot = token.slice("--execution-root=".length);
+      continue;
+    }
     out.push(token);
   }
-  return { argv: out, workspace };
+  return {
+    argv: out,
+    workspace,
+    registryWorkspace,
+    executionWorkspace,
+    projectRoot,
+    executionRoot,
+  };
 }
 
 async function listCommand(
   registry,
   tokens,
-  ws = null,
+  workspaces = null,
   { cwd = process.cwd() } = {},
 ) {
   const parsed = parseOptionTokens(tokens);
@@ -139,13 +234,39 @@ async function listCommand(
     parsed.options["include-drafts"] ??
     parsed.options["allow-draft"],
   );
-  const capabilities = registry.listCapabilities({ includeDrafts });
-  const workspaceSummary = summarizeWorkspaceBinding(registry, ws, { cwd });
+  const compact = Boolean(parsed.options.compact);
+  const selection = selectCapabilities(registry, {
+    includeDrafts,
+    compact,
+    search: parsed.options.search ?? null,
+    sideEffects: parsed.options["side-effects"] ?? null,
+    limit:
+      parsed.options.limit === undefined
+        ? undefined
+        : normalizeDiscoveryLimit(parsed.options.limit, null),
+  });
+  const capabilities = selection.capabilities;
+  const workspaceSummary = summarizeWorkspaceBinding(
+    registry,
+    workspaces?.registryWorkspace ?? null,
+    {
+      cwd,
+      executionWorkspace: workspaces?.executionWorkspace ?? null,
+    },
+  );
 
   if (parsed.options.json) {
     printJson({
       capabilities,
+      count: selection.count,
+      total: selection.total,
+      truncated: selection.truncated,
+      filters: selection.filters,
+      projectRoot: workspaceSummary.projectRoot,
+      executionRoot: workspaceSummary.executionRoot,
       workspace: workspaceSummary.workspace,
+      executionWorkspace: workspaceSummary.executionWorkspace,
+      workspaces: workspaceSummary.workspaces,
       notes: workspaceSummary.notes,
     });
     return;
@@ -161,10 +282,121 @@ async function listCommand(
   }
 
   for (const capability of capabilities) {
+    if (compact) {
+      console.log(
+        `${capability.id} — ${capability.summary} [${capability.lifecycleState}; ${formatSideEffects(capability.sideEffects)}; ${capability.sourceKind}]`,
+      );
+      continue;
+    }
     const source = capability.sourceCapabilityId
       ? ` -> ${capability.sourceCapabilityId}`
       : "";
     console.log(`${capability.id} [${capability.lifecycleState}]${source}`);
+  }
+  if (selection.truncated) {
+    console.log(
+      `note: showing ${selection.count} of ${selection.total}; refine with --search or increase --limit`,
+    );
+  }
+}
+
+async function guideCommand(
+  registry,
+  tokens,
+  workspaces = null,
+  { cwd = process.cwd() } = {},
+) {
+  const parsed = parseOptionTokens(tokens);
+  const [positionalIntent] = parsed.positionals;
+  const workspaceSummary = summarizeWorkspaceBinding(
+    registry,
+    workspaces?.registryWorkspace ?? null,
+    {
+      cwd,
+      executionWorkspace: workspaces?.executionWorkspace ?? null,
+    },
+  );
+  const guide = await buildWorkflowGuide(registry, {
+    projectRoot: workspaces?.registryWorkspace?.root ?? null,
+    intent: parsed.options.intent ?? positionalIntent ?? null,
+    limit:
+      parsed.options.limit === undefined
+        ? undefined
+        : normalizeDiscoveryLimit(parsed.options.limit, null),
+  });
+
+  if (parsed.options.json) {
+    printJson({
+      ...guide,
+      projectRoot: workspaceSummary.projectRoot,
+      executionRoot: workspaceSummary.executionRoot,
+      workspaces: workspaceSummary.workspaces,
+      notes: workspaceSummary.notes,
+    });
+    return;
+  }
+
+  for (const note of workspaceSummary.notes) console.log(`note: ${note}`);
+  for (const warning of guide.warnings) console.log(`warning: ${warning}`);
+  if (guide.recommendations.length === 0) {
+    console.log(
+      "no workflow recommendations declared; add recommendations to axf.workspace.json or recommendedFor to a capability/family command",
+    );
+    return;
+  }
+  for (const recommendation of guide.recommendations) {
+    console.log(
+      `${recommendation.label}: ${recommendation.capabilityId} [${recommendation.status}; ${recommendation.lifecycleState ?? "unknown"}; ${formatSideEffects(recommendation.sideEffects)}]`,
+    );
+    if (recommendation.summary) console.log(`  ${recommendation.summary}`);
+  }
+}
+
+async function explainCommand(
+  registry,
+  tokens,
+  workspaces = null,
+  { cwd = process.cwd() } = {},
+) {
+  const { pathTokens, options } = splitCommandTokens(tokens);
+  if (pathTokens.length === 0) {
+    throw new AxError(
+      "explain requires a capability id, path, family, or search term",
+      2,
+    );
+  }
+  const workspaceSummary = summarizeWorkspaceBinding(
+    registry,
+    workspaces?.registryWorkspace ?? null,
+    {
+      cwd,
+      executionWorkspace: workspaces?.executionWorkspace ?? null,
+    },
+  );
+  const explanation = explainCapability(registry, pathTokens, {
+    includeDrafts: Boolean(
+      options["any-lifecycle"] ??
+      options["include-drafts"] ??
+      options["allow-draft"],
+    ),
+    workspaceSummary,
+  });
+  if (options.json) {
+    printJson({
+      ...explanation,
+      projectRoot: workspaceSummary.projectRoot,
+      executionRoot: workspaceSummary.executionRoot,
+      workspaces: workspaceSummary.workspaces,
+      notes: workspaceSummary.notes,
+    });
+    return;
+  }
+  console.log(`${explanation.query}: ${explanation.status}`);
+  for (const reason of explanation.reasons) {
+    console.log(`reason: ${reason.code}: ${reason.message}`);
+  }
+  for (const suggestion of explanation.suggestions ?? []) {
+    console.log(`suggestion: ${suggestion.id} — ${suggestion.summary}`);
   }
 }
 
@@ -172,7 +404,7 @@ async function inspectCommand(
   registry,
   adapters,
   tokens,
-  ws = null,
+  workspaces = null,
   env = process.env,
   cwd = process.cwd(),
 ) {
@@ -183,7 +415,7 @@ async function inspectCommand(
 
   const resolved = registry.resolveInspectable(pathTokens);
   const cap = resolved.capability;
-  const runtime = buildRuntime(ws, env, cwd);
+  const runtime = buildRuntime(workspaces, env, cwd);
   const launchPlan =
     cap.adapterType === "cli"
       ? buildInspectableLaunchPlan(cap, runtime, env)
@@ -211,7 +443,14 @@ async function inspectCommand(
     : null;
 
   if (options.json) {
-    const payload = { ...resolved };
+    const summarizedWorkspaces = summarizeWorkspaces(workspaces);
+    const payload = {
+      ...resolved,
+      examples: buildCapabilityExamples(cap),
+      projectRoot: summarizedWorkspaces?.projectRoot ?? null,
+      executionRoot: summarizedWorkspaces?.executionRoot ?? null,
+      workspaces: summarizedWorkspaces,
+    };
     if (launchPlan) payload.launchPlan = launchPlan;
     if (adapterProvenance) payload.adapter = adapterProvenance;
     printJson(payload);
@@ -219,6 +458,17 @@ async function inspectCommand(
   }
 
   console.log(`${cap.id}`);
+  const summarizedWorkspaces = summarizeWorkspaces(workspaces);
+  if (summarizedWorkspaces?.projectRoot) {
+    console.log(
+      `projectRoot: ${summarizedWorkspaces.projectRoot.root} (${summarizedWorkspaces.projectRoot.source})`,
+    );
+  }
+  if (summarizedWorkspaces?.executionRoot) {
+    console.log(
+      `executionRoot: ${summarizedWorkspaces.executionRoot.root} (${summarizedWorkspaces.executionRoot.source})`,
+    );
+  }
   console.log(`summary: ${cap.summary}`);
   console.log(`scope: ${cap.scope}`);
   console.log(`lifecycle: ${cap.lifecycleState}`);
@@ -252,8 +502,11 @@ async function inspectCommand(
     console.log(`origin: ${cap.origin}`);
   }
   if (cap.sourceFamily) {
+    const layerText = cap.sourceFamily.layer
+      ? `, ${cap.sourceFamily.layer}`
+      : "";
     console.log(
-      `family: ${cap.sourceFamily.family}.${cap.sourceFamily.command} (${cap.sourceFamily.manifestPath})`,
+      `family: ${cap.sourceFamily.family}.${cap.sourceFamily.command} (${cap.sourceFamily.manifestPath}${layerText})`,
     );
   }
   if (cap.argMap && Object.keys(cap.argMap).length > 0) {
@@ -279,13 +532,28 @@ async function inspectCommand(
       console.log(`launch.cwd: ${launchPlan.cwd} (${launchPlan.cwdSource})`);
     }
   }
+  const examples = buildCapabilityExamples(cap);
+  for (const declared of examples.declared) {
+    console.log(
+      `example: ${typeof declared === "string" ? declared : JSON.stringify(declared)}`,
+    );
+  }
+  console.log(`example.inspect: ${examples.inspect.cli}`);
+  console.log(`example.run: ${examples.run.cli}`);
+  for (const mapping of examples.argumentMapping) {
+    if (mapping.providerFlag) {
+      console.log(
+        `arg.${mapping.publicName}: ${mapping.publicFlag} -> ${mapping.providerFlag}`,
+      );
+    }
+  }
 }
 
 async function runCommand(
   registry,
   adapters,
   tokens,
-  ws = null,
+  workspaces = null,
   env = process.env,
   cwd = process.cwd(),
 ) {
@@ -299,14 +567,17 @@ async function runCommand(
     args: options,
     allowDraft: Boolean(options["any-lifecycle"] ?? options["allow-draft"]),
   });
-  const runtime = buildRuntime(ws, env, cwd);
+  const runtime = buildRuntime(workspaces, env, cwd);
   const result = await executeResolvedCapability(resolved, {
     adapters,
     runtime,
   });
 
   if (options.json) {
-    printJson(result);
+    printJson({
+      ...result,
+      workspaces: summarizeWorkspaces(workspaces),
+    });
     return;
   }
 
@@ -506,6 +777,11 @@ function printMetadataField(label, value) {
   }
 }
 
+function formatSideEffects(value) {
+  if (Array.isArray(value)) return value.join(",");
+  return value ?? "unknown";
+}
+
 async function initToolspace(rootDir, name) {
   assertSafeName(name, "toolspace");
   const filePath = path.join(
@@ -680,17 +956,34 @@ async function doctorCommand(
   registry,
   adapters,
   tokens,
-  ws = null,
+  workspaces = null,
   env = process.env,
   cwd = process.cwd(),
 ) {
   const parsed = parseOptionTokens(tokens);
   const report = inspectRegistry(registry, { adapters });
-  const workspaceSummary = summarizeWorkspaceBinding(registry, ws, { cwd });
+  const workspaceSummary = summarizeWorkspaceBinding(
+    registry,
+    workspaces?.registryWorkspace ?? null,
+    {
+      cwd,
+      executionWorkspace: workspaces?.executionWorkspace ?? null,
+    },
+  );
+  if (workspaceSummary.projectRoot)
+    report.projectRoot = workspaceSummary.projectRoot;
+  if (workspaceSummary.executionRoot) {
+    report.executionRoot = workspaceSummary.executionRoot;
+  }
   if (workspaceSummary.workspace) report.workspace = workspaceSummary.workspace;
+  if (workspaceSummary.executionWorkspace) {
+    report.executionWorkspace = workspaceSummary.executionWorkspace;
+  }
+  report.workspaces = workspaceSummary.workspaces;
   report.notes = workspaceSummary.notes;
   const runtimeDiagnostics = collectRuntimeDiagnostics(registry, {
-    workspace: ws,
+    workspace: workspaces?.registryWorkspace ?? null,
+    executionWorkspace: workspaces?.executionWorkspace ?? null,
     env,
     cwd,
     platform: process.platform,
@@ -703,13 +996,21 @@ async function doctorCommand(
     return;
   }
 
-  if (report.workspace) {
-    const markerNote = report.workspace.viaMarker ? "" : ", no marker";
+  if (report.projectRoot) {
+    const markerNote = report.projectRoot.viaMarker ? "" : ", no marker";
     console.log(
-      `workspace: ${report.workspace.root} (${report.workspace.source}${markerNote})`,
+      `projectRoot: ${report.projectRoot.root} (${report.projectRoot.source}${markerNote})`,
     );
+    if (report.executionRoot) {
+      const executionMarkerNote = report.executionRoot.viaMarker
+        ? ""
+        : ", no marker";
+      console.log(
+        `executionRoot: ${report.executionRoot.root} (${report.executionRoot.source}${executionMarkerNote})`,
+      );
+    }
   } else {
-    console.log(`workspace: ${registry.rootDir}`);
+    console.log(`projectRoot: ${registry.rootDir}`);
   }
   if (report.runtime) {
     console.log(
@@ -726,6 +1027,25 @@ async function doctorCommand(
   console.log(`capabilities: ${report.capabilityCount}`);
   console.log(`toolspaces: ${report.toolspaceCount}`);
   console.log(`adapters: ${report.adapterCount}`);
+  if (report.families?.length > 0) {
+    console.log("families:");
+    for (const family of report.families) {
+      console.log(
+        `  - ${family.scope}.${family.family} (${family.layer}: ${family.manifestPath})`,
+      );
+    }
+  }
+  if (report.shadowedFamilies?.length > 0) {
+    console.log("shadowed families:");
+    for (const family of report.shadowedFamilies) {
+      const winner = family.shadowedBy
+        ? ` -> ${family.shadowedBy.layer}:${family.shadowedBy.manifestPath}`
+        : "";
+      console.log(
+        `  - ${family.scope}.${family.family} (${family.layer}: ${family.manifestPath})${winner}`,
+      );
+    }
+  }
   if (report.adaptersByType?.length > 0) {
     for (const a of report.adaptersByType) {
       const id =
@@ -760,20 +1080,82 @@ async function doctorCommand(
   }
 }
 
-function buildRuntime(ws = null, env = process.env, cwd = process.cwd()) {
+function buildRuntime(
+  workspaces = null,
+  env = process.env,
+  cwd = process.cwd(),
+) {
   const runtime = {
     cwd,
     env,
     platform: process.platform,
   };
-  if (ws) {
+  if (workspaces?.registryWorkspace) {
+    runtime.projectRoot = {
+      root: workspaces.registryWorkspace.root,
+      viaMarker: workspaces.registryWorkspace.viaMarker,
+      source: workspaces.registryWorkspace.source,
+    };
+    runtime.registryWorkspace = {
+      root: workspaces.registryWorkspace.root,
+      viaMarker: workspaces.registryWorkspace.viaMarker,
+      source: workspaces.registryWorkspace.source,
+    };
+  }
+  if (workspaces?.executionWorkspace) {
+    runtime.executionRoot = {
+      root: workspaces.executionWorkspace.root,
+      viaMarker: workspaces.executionWorkspace.viaMarker,
+      source: workspaces.executionWorkspace.source,
+    };
+    runtime.executionWorkspace = {
+      root: workspaces.executionWorkspace.root,
+      viaMarker: workspaces.executionWorkspace.viaMarker,
+      source: workspaces.executionWorkspace.source,
+    };
     runtime.workspace = {
-      root: ws.root,
-      viaMarker: ws.viaMarker,
-      source: ws.source,
+      root: workspaces.executionWorkspace.root,
+      viaMarker: workspaces.executionWorkspace.viaMarker,
+      source: workspaces.executionWorkspace.source,
     };
   }
   return runtime;
+}
+
+function summarizeWorkspaces(workspaces) {
+  if (!workspaces) {
+    return null;
+  }
+  return {
+    projectRoot: workspaces.registryWorkspace
+      ? {
+          root: workspaces.registryWorkspace.root,
+          viaMarker: workspaces.registryWorkspace.viaMarker,
+          source: workspaces.registryWorkspace.source,
+        }
+      : null,
+    executionRoot: workspaces.executionWorkspace
+      ? {
+          root: workspaces.executionWorkspace.root,
+          viaMarker: workspaces.executionWorkspace.viaMarker,
+          source: workspaces.executionWorkspace.source,
+        }
+      : null,
+    registryWorkspace: workspaces.registryWorkspace
+      ? {
+          root: workspaces.registryWorkspace.root,
+          viaMarker: workspaces.registryWorkspace.viaMarker,
+          source: workspaces.registryWorkspace.source,
+        }
+      : null,
+    executionWorkspace: workspaces.executionWorkspace
+      ? {
+          root: workspaces.executionWorkspace.root,
+          viaMarker: workspaces.executionWorkspace.viaMarker,
+          source: workspaces.executionWorkspace.source,
+        }
+      : null,
+  };
 }
 
 function buildInspectableLaunchPlan(capability, runtime, env) {
@@ -842,10 +1224,16 @@ function printHelp() {
   console.log(`axf framework prototype
 
 Global flags:
-    --workspace <path>     Workspace root (overrides marker-file lookup and AXF_WORKSPACE).
+  --project-root <path>         Canonical project root for manifest/adaptor discovery.
+  --execution-root <path>       Canonical execution root for runtime cwd and caller execution.
+  --workspace <path>            Legacy alias: set both project and execution roots.
+  --registry-workspace <path>   Legacy alias for --project-root.
+  --execution-workspace <path>  Legacy alias for --execution-root.
 
 Usage:
-    axf list [--all|--any-lifecycle] [--json]
+    axf list [--compact] [--search <term>] [--side-effects <kind>] [--limit <n>] [--all|--any-lifecycle] [--json]
+    axf guide [context|check|handoff] [--limit <n>] [--json]
+    axf explain <id-or-path-or-family> [--any-lifecycle] [--json]
     axf inspect <id-or-path> [--json]
     axf run <id-or-path> [--key value] [--json] [--any-lifecycle]
     axf init toolspace <name>
@@ -865,7 +1253,9 @@ Lifecycle flag:
   --allow-draft          Deprecated alias for --any-lifecycle (warns to stderr).
 
 Examples:
-    axf list
+    axf list --compact --search lex
+    axf guide context
+    axf explain global.lex
     axf inspect echo say
     axf run echo say --message hello
     axf run toy echo say --message hello
