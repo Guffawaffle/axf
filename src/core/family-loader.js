@@ -27,6 +27,10 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { LIFECYCLE_STATES } from "./manifest-validator.js";
+import {
+  AXF_OPTION_PREFIX,
+  isFrameworkReservedArgName,
+} from "./framework-options.js";
 
 const SUPPORTED_FAMILY_VERSIONS = new Set(["axf/v0"]);
 const SUPPORTED_ARG_STYLES = new Set([
@@ -42,23 +46,6 @@ const DESCRIPTIVE_METADATA_KEYS = [
   "examples",
   "recommendedFor",
 ];
-
-// Args the framework reserves for itself. A family or capability that
-// declares one of these as a public arg is rejected, because the CLI
-// would have no way to disambiguate them at the command line.
-export const RESERVED_ARG_NAMES = new Set([
-  "json",
-  "workspace",
-  "any-lifecycle",
-  "allow-draft",
-  "include-drafts",
-  "all",
-  "compact",
-  "search",
-  "side-effects",
-  "limit",
-  "intent",
-]);
 
 export async function loadFamilies({ familiesRoot, rootDir }) {
   const families = [];
@@ -194,14 +181,17 @@ function normalizeFamilyManifest(manifest, label) {
       });
       cmd.lifecycleState = commandLifecycle;
     }
-    if (cmd.args) {
-      for (const argName of Object.keys(cmd.args)) {
-        if (RESERVED_ARG_NAMES.has(argName)) {
-          issues.push({
-            severity: "error",
-            message: `${label}: command '${cmdKey}' arg '${argName}' collides with a framework-reserved name`,
-          });
-        }
+    const publicArgNames = new Set([
+      ...Object.keys(cmd.args ?? {}),
+      ...Object.keys(cmd.argsSchema?.properties ?? {}),
+      ...Object.keys(cmd.defaults ?? {}),
+    ]);
+    for (const argName of publicArgNames) {
+      if (isFrameworkReservedArgName(argName)) {
+        issues.push({
+          severity: "error",
+          message: `${label}: command '${cmdKey}' arg '${argName}' uses the reserved '${AXF_OPTION_PREFIX}' framework namespace`,
+        });
       }
     }
     validateRecommendedFor(

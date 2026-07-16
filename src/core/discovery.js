@@ -422,7 +422,10 @@ export function buildCapabilityExamples(capability) {
       mcp: { operation: "inspect", target: { id: capability.id } },
     },
     run: {
-      cli: [`axf run ${capability.id}`, ...cliArgs].join(" "),
+      cli: [
+        `axf run ${capability.id}`,
+        ...(cliArgs.length > 0 ? ["--", ...cliArgs] : []),
+      ].join(" "),
       mcp: {
         operation: "run",
         target: { id: capability.id },

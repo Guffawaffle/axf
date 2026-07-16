@@ -2,11 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { AxError } from "./errors.js";
+import { copyDescriptiveMetadata } from "./family-loader.js";
 import {
-  RESERVED_ARG_NAMES,
-  computeArgMap,
-  copyDescriptiveMetadata,
-} from "./family-loader.js";
+  AXF_OPTION_PREFIX,
+  LEGACY_FAMILY_RESERVED_ARG_NAMES,
+  isFrameworkReservedArgName,
+} from "./framework-options.js";
 import { prepareCommandInvocation } from "./command-invocation.js";
 
 const SUPPORTED_IMPORT_KINDS = new Set(["ax-inventory"]);
@@ -122,18 +123,36 @@ async function scoutAxInventory(rootDir, importSource, { env }) {
   const issues = [];
 
   const generatedCommands = familyManifest.commands;
-  const standaloneCapabilities = [];
   for (const [commandName, command] of Object.entries(generatedCommands)) {
-    const reservedArgs = Object.keys(command.args ?? {}).filter((arg) =>
-      RESERVED_ARG_NAMES.has(arg),
+    const frameworkArgs = Object.keys(command.args ?? {}).filter((arg) =>
+      isFrameworkReservedArgName(arg),
     );
-    if (reservedArgs.length === 0) continue;
-    delete generatedCommands[commandName];
-    standaloneCapabilities.push({ commandName, command, reservedArgs });
-    issues.push({
-      severity: "warning",
-      message: `${familyName}.${commandName} materialized because it exposes reserved arg(s): ${reservedArgs.join(", ")}`,
-    });
+    if (frameworkArgs.length > 0) {
+      delete generatedCommands[commandName];
+      issues.push({
+        severity: "error",
+        message: `${familyName}.${commandName} cannot be imported because it exposes the reserved '${AXF_OPTION_PREFIX}' namespace: ${frameworkArgs.join(", ")}; rename the public arg and preserve the provider spelling with providerFlag`,
+      });
+      continue;
+    }
+
+    const legacyReservedArgs = Object.keys(command.args ?? {}).filter((arg) =>
+      LEGACY_FAMILY_RESERVED_ARG_NAMES.has(arg),
+    );
+    if (legacyReservedArgs.length === 0) continue;
+
+    const oldStandalonePath = capabilityManifestPath(
+      rootDir,
+      familyManifest,
+      commandName,
+    );
+    const oldStandalone = await readJsonIfExists(oldStandalonePath);
+    if (oldStandalone && !oldStandalone.sourceFamily) {
+      issues.push({
+        severity: "warning",
+        message: `${familyName}.${commandName} can now remain imported, but ${path.relative(rootDir, oldStandalonePath)} may be an older reserved-arg workaround and will shadow it; review and remove that file, or add sourceFamily to keep an intentional materialized override`,
+      });
+    }
   }
 
   await collectJsonChange(changes, {
@@ -144,34 +163,11 @@ async function scoutAxInventory(rootDir, importSource, { env }) {
     manifest: familyManifest,
   });
 
-  for (const standalone of standaloneCapabilities) {
-    const capabilityPath = capabilityManifestPath(
-      rootDir,
-      familyManifest,
-      standalone.commandName,
-    );
-    const existingCapability = await readJsonIfExists(capabilityPath);
-    const capability = buildStandaloneCapability({
-      familyManifest,
-      commandName: standalone.commandName,
-      command: standalone.command,
-      existingCapability,
-    });
-    await collectJsonChange(changes, {
-      rootDir,
-      path: capabilityPath,
-      kind: "capability",
-      family: familyName,
-      command: standalone.commandName,
-      manifest: capability,
-    });
-  }
-
   return {
     kind: importSource.kind,
     family: familyName,
     commandCount: inventory.commands?.length ?? 0,
-    materializedCount: standaloneCapabilities.length,
+    materializedCount: 0,
     changes,
     issues,
   };
@@ -381,55 +377,6 @@ function jsonSchemaType(parameter) {
   return "string";
 }
 
-function buildStandaloneCapability({
-  familyManifest,
-  commandName,
-  command,
-  existingCapability,
-}) {
-  const scope = familyManifest.scope ?? "global";
-  const idPrefix = scope === "workspace-local" ? "workspace" : "global";
-  const id = `${idPrefix}.${familyManifest.family}.${commandName}`;
-  const manifest = {
-    manifestVersion: familyManifest.manifestVersion,
-    id,
-    summary: existingCapability?.summary ?? command.summary,
-    provider: existingCapability?.provider ?? familyManifest.provider,
-    adapterType: existingCapability?.adapterType ?? familyManifest.adapterType,
-    executionTarget: command.executionTarget,
-    argsSchema: mergeArgsSchema(
-      command.argsSchema,
-      existingCapability?.argsSchema,
-    ),
-    outputModes: existingCapability?.outputModes ??
-      command.outputModes ??
-      familyManifest.outputModes ?? ["json"],
-    sideEffects: command.sideEffects,
-    scope,
-    lifecycleState: normalizeLifecycleState(
-      existingCapability?.lifecycleState ??
-        command.lifecycleState ??
-        familyManifest.lifecycleState ??
-        "active",
-    ),
-    defaults: existingCapability?.defaults ?? command.defaults ?? {},
-    policies:
-      existingCapability?.policies ??
-      command.policies ??
-      familyManifest.policies ??
-      [],
-    owner: existingCapability?.owner ?? command.owner ?? familyManifest.owner,
-    argMap:
-      existingCapability?.argMap ??
-      computeArgMap(command.args ?? {}, familyManifest),
-  };
-  copyScoutDescriptiveMetadata(manifest, existingCapability, command);
-  if (existingCapability?.sourceFamily) {
-    manifest.sourceFamily = existingCapability.sourceFamily;
-  }
-  return manifest;
-}
-
 function copyScoutDescriptiveMetadata(target, ...sources) {
   const candidates = [];
   for (const source of sources) {
@@ -445,30 +392,6 @@ function copyScoutDescriptiveMetadata(target, ...sources) {
   }
 
   return copyDescriptiveMetadata(target, ...candidates);
-}
-
-function mergeArgsSchema(generated, existing) {
-  if (!existing) return generated;
-  const properties = {};
-  for (const [name, property] of Object.entries(generated.properties ?? {})) {
-    properties[name] = {
-      ...property,
-      ...(existing.properties?.[name] ?? {}),
-    };
-  }
-  const schema = { type: generated.type ?? "object", properties };
-  const required = (existing.required ?? []).filter((name) => properties[name]);
-  if (required.length > 0) {
-    schema.required = required;
-  }
-  const oneOf = (existing.oneOf ?? []).filter((clause) =>
-    (clause.required ?? []).every((name) => properties[name]),
-  );
-  if (oneOf.length > 0) {
-    schema.oneOf = oneOf;
-  }
-  schema.additionalProperties = generated.additionalProperties ?? false;
-  return schema;
 }
 
 async function collectJsonChange(

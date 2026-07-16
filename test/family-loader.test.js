@@ -9,10 +9,10 @@ import {
   computeArgMap,
   synthesizeFamilyCapabilities,
   validateFamilyManifest,
-  RESERVED_ARG_NAMES,
 } from "../src/core/family-loader.js";
 import { evaluatePolicies } from "../src/core/policy.js";
 import { main } from "../src/cli/main.js";
+import { validateCapabilityManifest } from "../src/core/manifest-validator.js";
 
 const REPO_ROOT = new URL("..", import.meta.url).pathname;
 
@@ -220,23 +220,117 @@ test("powershell-pascal style derives -PascalCase flags", () => {
   assert.equal(deriveFlag("max-count", "double-dash-kebab"), "--max-count");
 });
 
-test("family rejects reserved arg names", () => {
-  const issues = validateFamilyManifest(
+test("family accepts natural command-local names and reserves only axf namespace", () => {
+  const accepted = validateFamilyManifest(
+    {
+      manifestVersion: "axf/v0",
+      family: "good",
+      adapterType: "cli",
+      commands: {
+        run: {
+          args: {
+            json: { type: "boolean" },
+            limit: { type: "integer" },
+            all: { type: "boolean" },
+          },
+        },
+      },
+    },
+    "good.family.json",
+  );
+  assert.equal(accepted.filter((issue) => issue.severity === "error").length, 0);
+
+  const rejected = validateFamilyManifest(
     {
       manifestVersion: "axf/v0",
       family: "bad",
       adapterType: "cli",
       commands: {
-        run: { args: { json: { type: "boolean" } } },
+        run: {
+          argsSchema: {
+            type: "object",
+            properties: { "axf-json": { type: "boolean" } },
+          },
+        },
       },
     },
     "bad.family.json",
   );
   assert.ok(
-    issues.some((i) => /reserved/.test(i.message)),
-    "must flag reserved arg name",
+    rejected.some((issue) => /reserved 'axf-/.test(issue.message)),
+    "must reserve the AXF option namespace",
   );
-  assert.ok(RESERVED_ARG_NAMES.has("json"));
+});
+
+test("run boundary validates and maps common family arguments", async () => {
+  const root = await bootstrap();
+  const capturePath = path.join(root, "capture-argv.mjs");
+  await writeFile(
+    capturePath,
+    "console.log(JSON.stringify(process.argv.slice(2)));\n",
+  );
+  await writeFamily(root, "demo", {
+    manifestVersion: "axf/v0",
+    family: "demo",
+    scope: "global",
+    provider: "demo",
+    adapterType: "cli",
+    providerArgStyle: "powershell-pascal",
+    lifecycleState: "active",
+    commands: {
+      query: {
+        summary: "Query demo data",
+        executionTarget: {
+          command: process.execPath,
+          args: [capturePath],
+        },
+        args: {
+          limit: { type: "integer" },
+          all: { type: "boolean" },
+          json: { type: "boolean" },
+        },
+      },
+    },
+  });
+
+  const output = JSON.parse(
+    await captureStdout(() =>
+      main([
+        "--workspace",
+        root,
+        "run",
+        "demo",
+        "query",
+        "--axf-json",
+        "--",
+        "--limit",
+        "20",
+        "--all",
+        "--json",
+      ]),
+    ),
+  );
+
+  assert.deepEqual(output.data, ["-Limit", "20", "-All", "-Json"]);
+  assert.deepEqual(output.meta.args.slice(-4), [
+    "-Limit",
+    "20",
+    "-All",
+    "-Json",
+  ]);
+});
+
+test("standalone capability manifests also reserve the axf namespace", () => {
+  const issues = validateCapabilityManifest(
+    {
+      argsSchema: {
+        type: "object",
+        properties: { "axf-json": { type: "boolean" } },
+      },
+    },
+    "global.demo.bad.json",
+  );
+  assert.ok(issues.some((issue) => /reserved 'axf-/.test(issue.message)));
 });
 
 test("materialized capability overrides imported family entry", async () => {

@@ -168,10 +168,14 @@ test("unknown fully qualified capability prefixes suggest runnable capabilities"
   );
 });
 
-test("framework flags are stripped from validated args", async () => {
+test("structured callers preserve natural args that resemble CLI controls", async () => {
   const { registry } = await ctx();
   const resolved = resolveCapability(registry, ["echo", "say"], {
     args: { message: "x", json: true, "allow-draft": true },
   });
-  assert.deepEqual(resolved.args, { message: "x" });
+  assert.deepEqual(resolved.args, {
+    message: "x",
+    json: true,
+    "allow-draft": true,
+  });
 });
