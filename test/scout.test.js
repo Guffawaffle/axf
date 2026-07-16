@@ -88,22 +88,32 @@ console.log(JSON.stringify(inventory));
 `,
   );
   await writeFile(
-    path.join(root, "manifests", "capabilities", "global.demo.log-query.json"),
+    path.join(root, "manifests", "families", "demo.family.json"),
     JSON.stringify(
       {
         manifestVersion: "axf/v0",
-        id: "global.demo.log-query",
-        argsSchema: {
-          type: "object",
-          properties: {
-            profile: {
-              type: "string",
-              enum: ["dirty", "errors"],
+        family: "demo",
+        adapterType: "cli",
+        commands: {
+          "log-query": {
+            args: {
+              profile: {},
+              all: {},
+              last: {},
             },
+            argsSchema: {
+              type: "object",
+              properties: {
+                profile: {
+                  type: "string",
+                  enum: ["dirty", "errors"],
+                },
+              },
+              additionalProperties: false,
+            },
+            policies: ["nonexistent"],
           },
-          additionalProperties: false,
         },
-        policies: ["nonexistent"],
       },
       null,
       2,
@@ -149,23 +159,17 @@ test("scout --write preserves nested provider metadata in written files and relo
     inventorySource: "provider",
     logFile: "demo.log",
   });
-
-  const logQuery = JSON.parse(
-    await readFile(
-      path.join(
-        root,
-        "manifests",
-        "capabilities",
-        "global.demo.log-query.json",
-      ),
-      "utf8",
-    ),
-  );
-  assert.deepEqual(logQuery.warnings, ["Large log scans may be slow"]);
-  assert.deepEqual(logQuery.details, {
+  assert.deepEqual(family.commands["log-query"].warnings, [
+    "Large log scans may be slow",
+  ]);
+  assert.deepEqual(family.commands["log-query"].details, {
     inventorySource: "provider",
     queryMode: "full",
   });
+  assert.deepEqual(
+    family.commands["log-query"].argsSchema.properties.profile.enum,
+    ["dirty", "errors"],
+  );
 
   const registry = await createRegistry({ rootDir: root });
   const status = registry.getCapability("global.demo.status");
@@ -251,46 +255,26 @@ test("scout checks and writes ax inventory imports", async () => {
     inventorySource: "provider",
     logFile: "demo.log",
   });
-  assert.equal(
-    family.commands["log-query"],
-    undefined,
-    "reserved --all command should not stay in the family manifest",
-  );
-
-  const logQuery = JSON.parse(
-    await readFile(
-      path.join(
-        root,
-        "manifests",
-        "capabilities",
-        "global.demo.log-query.json",
-      ),
-      "utf8",
-    ),
-  );
-  assert.equal(logQuery.id, "global.demo.log-query");
+  const logQuery = family.commands["log-query"];
+  assert.ok(logQuery, "common --all arg should remain in the family manifest");
   assert.deepEqual(logQuery.argsSchema.properties.profile.enum, [
     "dirty",
     "errors",
   ]);
-  assert.equal(logQuery.argMap.all, "-All");
-  assert.equal(logQuery.argMap.last, "-Last");
   assert.deepEqual(logQuery.warnings, ["Large log scans may be slow"]);
   assert.deepEqual(logQuery.details, {
     inventorySource: "provider",
     queryMode: "full",
   });
-  assert.equal(
-    logQuery.sourceFamily,
-    undefined,
-    "reserved standalone command is not in the family manifest",
-  );
 
   const registry = await createRegistry({ rootDir: root });
   const status = registry.getCapability("global.demo.status");
   const logQueryCapability = registry.getCapability("global.demo.log-query");
   assert.ok(status);
   assert.ok(logQueryCapability);
+  assert.equal(logQueryCapability.origin, "imported");
+  assert.equal(logQueryCapability.argMap.all, "-All");
+  assert.equal(logQueryCapability.argMap.last, "-Last");
   assert.deepEqual(status.warnings, [
     "Provider inventory detected partial log coverage",
   ]);
@@ -298,6 +282,49 @@ test("scout checks and writes ax inventory imports", async () => {
     inventorySource: "provider",
     queryMode: "full",
   });
+});
+
+test("scout warns when an old reserved-arg workaround will shadow an import", async () => {
+  const root = await bootstrap();
+  await writeFile(
+    path.join(
+      root,
+      "manifests",
+      "capabilities",
+      "global.demo.log-query.json",
+    ),
+    JSON.stringify(
+      {
+        manifestVersion: "axf/v0",
+        id: "global.demo.log-query",
+        summary: "Legacy standalone query",
+        provider: "demo",
+        adapterType: "cli",
+        executionTarget: { command: process.execPath },
+        argsSchema: {
+          type: "object",
+          properties: { all: { type: "boolean" } },
+          additionalProperties: false,
+        },
+        outputModes: ["json"],
+        sideEffects: "read",
+        scope: "global",
+        lifecycleState: "active",
+        defaults: {},
+        policies: [],
+        owner: "module:demo",
+        argMap: { all: "-All" },
+      },
+      null,
+      2,
+    ),
+  );
+
+  const output = await captureStdout(() =>
+    main(["--workspace", root, "scout"]),
+  );
+  assert.match(output, /may be an older reserved-arg workaround/);
+  assert.match(output, /will shadow it/);
 });
 
 test("scout rejects check and write together", async () => {

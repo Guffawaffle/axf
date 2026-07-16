@@ -1,6 +1,7 @@
 import { parseCapabilityInput } from "./path-model.js";
 import { AxError } from "./errors.js";
 import { assertValid } from "./schema-validator.js";
+import { isFrameworkReservedArgName } from "./framework-options.js";
 
 export function resolveCapability(registry, inputTokens, context = {}) {
     const inspected = registry.resolveInspectable(inputTokens);
@@ -20,12 +21,18 @@ export function resolveCapability(registry, inputTokens, context = {}) {
         ...(context.args ?? {})
     };
 
-    // Schema-driven validation + coercion. Framework flags are stripped
-    // before validation so users can pass --json / --allow-draft freely.
-    const cleaned = stripFrameworkFlags(merged);
+    for (const name of Object.keys(merged)) {
+        if (isFrameworkReservedArgName(name)) {
+            throw new AxError(
+                `capability args cannot use the reserved '--${name}' AXF option namespace`,
+                2
+            );
+        }
+    }
+
     const validated = capability.argsSchema
-        ? assertValid(capability.argsSchema, cleaned, `capability '${capability.id}' args`)
-        : cleaned;
+        ? assertValid(capability.argsSchema, merged, `capability '${capability.id}' args`)
+        : merged;
 
     return {
         input: parseCapabilityInput(registry, inputTokens),
@@ -33,17 +40,6 @@ export function resolveCapability(registry, inputTokens, context = {}) {
         args: validated,
         injectedDefaults: inspected.injectedDefaults
     };
-}
-
-const FRAMEWORK_FLAGS = new Set(["json", "allow-draft", "any-lifecycle"]);
-
-function stripFrameworkFlags(args) {
-    const out = {};
-    for (const [key, value] of Object.entries(args)) {
-        if (FRAMEWORK_FLAGS.has(key)) continue;
-        out[key] = value;
-    }
-    return out;
 }
 
 export function synthesizeMountedCapability({

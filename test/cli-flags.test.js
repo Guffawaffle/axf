@@ -39,7 +39,9 @@ async function bootstrap({ withInternal = true } = {}) {
       `export async function execute(resolved) {
                 return {
                     ok: true,
-                    data: resolved.args?.message ?? null,
+                    data: Object.prototype.hasOwnProperty.call(resolved.args ?? {}, "message")
+                        ? resolved.args.message
+                        : resolved.args,
                     meta: { capabilityId: resolved.capability.id, adapterType: "internal" }
                 };
             }`,
@@ -140,10 +142,208 @@ test("run --allow-draft (deprecated) still works as alias", async () => {
   assert.equal(result.ok, true);
 });
 
+test("run boundary keeps declared json and limit capability-owned", async () => {
+  const root = await bootstrap();
+  await writeCap(
+    root,
+    basicCap({
+      lifecycleState: "active",
+      argsSchema: {
+        type: "object",
+        properties: {
+          json: { type: "boolean" },
+          limit: { type: "integer" },
+        },
+        additionalProperties: false,
+      },
+    }),
+  );
+
+  const output = JSON.parse(
+    await captureStdout(() =>
+      main([
+        "--workspace",
+        root,
+        "run",
+        "demo",
+        "thing",
+        "--axf-json",
+        "--",
+        "--json",
+        "--limit",
+        "12",
+      ]),
+    ),
+  );
+
+  assert.deepEqual(output.data, { json: true, limit: 12 });
+  assert.deepEqual(output.meta, {
+    capabilityId: "global.demo.thing",
+    adapterType: "internal",
+  });
+});
+
+test("declared legacy run names stay downstream without a boundary", async () => {
+  const root = await bootstrap();
+  await writeCap(
+    root,
+    basicCap({
+      lifecycleState: "active",
+      argsSchema: {
+        type: "object",
+        properties: { json: { type: "boolean" } },
+        additionalProperties: false,
+      },
+    }),
+  );
+
+  const plain = JSON.parse(
+    await captureStdout(() =>
+      main(["--workspace", root, "run", "demo", "thing", "--json"]),
+    ),
+  );
+  assert.deepEqual(plain, { json: true });
+  assert.equal(plain.ok, undefined);
+
+  const envelope = JSON.parse(
+    await captureStdout(() =>
+      main([
+        "--workspace",
+        root,
+        "run",
+        "demo",
+        "thing",
+        "--json",
+        "--axf-json",
+      ]),
+    ),
+  );
+  assert.deepEqual(envelope.data, { json: true });
+});
+
+test("boundary lets legacy lifecycle spelling control AXF and reach the capability", async () => {
+  const root = await bootstrap();
+  await writeCap(
+    root,
+    basicCap({
+      lifecycleState: "draft",
+      argsSchema: {
+        type: "object",
+        properties: { "any-lifecycle": { type: "boolean" } },
+        additionalProperties: false,
+      },
+    }),
+  );
+
+  const output = JSON.parse(
+    await captureStdout(() =>
+      main([
+        "--workspace",
+        root,
+        "run",
+        "demo",
+        "thing",
+        "--any-lifecycle",
+        "--json",
+        "--",
+        "--any-lifecycle",
+      ]),
+    ),
+  );
+  assert.deepEqual(output.data, { "any-lifecycle": true });
+});
+
+test("boundary requires capability options to appear after it", async () => {
+  const root = await bootstrap();
+  await writeCap(root, basicCap({ lifecycleState: "active" }));
+
+  await assert.rejects(
+    () =>
+      main([
+        "--workspace",
+        root,
+        "run",
+        "demo",
+        "thing",
+        "--message",
+        "hi",
+        "--",
+      ]),
+    /must appear after the '--' boundary/,
+  );
+});
+
+test("root-like names after the command belong to the capability", async () => {
+  const root = await bootstrap();
+  await writeCap(
+    root,
+    basicCap({
+      lifecycleState: "active",
+      argsSchema: {
+        type: "object",
+        properties: {
+          workspace: { type: "string" },
+          "project-root": { type: "string" },
+          "execution-root": { type: "string" },
+        },
+        additionalProperties: false,
+      },
+    }),
+  );
+
+  const output = JSON.parse(
+    await captureStdout(() =>
+      main([
+        "run",
+        "demo",
+        "thing",
+        "--axf-workspace",
+        root,
+        "--axf-json",
+        "--",
+        "--workspace",
+        "child-workspace",
+        "--project-root",
+        "child-project",
+        "--execution-root",
+        "child-execution",
+      ]),
+    ),
+  );
+
+  assert.deepEqual(output.data, {
+    workspace: "child-workspace",
+    "project-root": "child-project",
+    "execution-root": "child-execution",
+  });
+  assert.equal(output.workspaces.projectRoot.root, root);
+  assert.equal(output.workspaces.executionRoot.root, root);
+
+  const positionalOwnership = JSON.parse(
+    await captureStdout(() =>
+      main([
+        "--workspace",
+        root,
+        "run",
+        "demo",
+        "thing",
+        "--workspace",
+        "after-command",
+        "--axf-json",
+      ]),
+    ),
+  );
+  assert.deepEqual(positionalOwnership.data, { workspace: "after-command" });
+  assert.equal(positionalOwnership.workspaces.projectRoot.root, root);
+});
+
 test("help documents canonical project and execution root flags", async () => {
   const out = await captureStdout(() => main(["help"]));
   assert.match(out, /--project-root <path>/);
   assert.match(out, /--execution-root <path>/);
+  assert.match(out, /--axf-project-root <path>/);
+  assert.match(out, /--axf-json/);
+  assert.match(out, /schema-validated/);
   assert.match(
     out,
     /--registry-workspace <path>\s+Legacy alias for --project-root/,
@@ -172,6 +372,21 @@ test("list --any-lifecycle includes drafts", async () => {
   assert.ok(
     withFlag.includes("global.demo.thing"),
     "draft should appear with --any-lifecycle",
+  );
+});
+
+test("non-run commands retain trailing legacy root flags", async () => {
+  const root = await bootstrap();
+  await writeCap(root, basicCap({ lifecycleState: "active" }));
+
+  const output = JSON.parse(
+    await captureStdout(() => main(["list", "--project-root", root, "--json"])),
+  );
+  assert.equal(output.projectRoot.root, root);
+  assert.ok(
+    output.capabilities.some(
+      (capability) => capability.id === "global.demo.thing",
+    ),
   );
 });
 

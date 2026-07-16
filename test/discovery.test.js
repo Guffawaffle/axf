@@ -347,7 +347,10 @@ test("inspect examples map public arguments through provider flags", () => {
     }),
   );
 
-  assert.match(examples.run.cli, /--project-root \/repo/);
+  assert.equal(
+    examples.run.cli,
+    "axf run global.demo.check -- --project-root /repo",
+  );
   assert.deepEqual(examples.run.mcp.args, { projectRoot: "/repo" });
   assert.deepEqual(examples.argumentMapping[0], {
     publicName: "projectRoot",

@@ -12,7 +12,7 @@ import { AxError } from "../core/errors.js";
 // capability's argsSchema. This keeps CLI parsing predictable and
 // pushes type knowledge to the place that owns it.
 
-export function splitCommandTokens(tokens) {
+export function splitCommandTokens(tokens, { rejectDuplicates = false } = {}) {
     const pathTokens = [];
     const optionTokens = [];
     let sawOption = false;
@@ -23,13 +23,60 @@ export function splitCommandTokens(tokens) {
         else pathTokens.push(token);
     }
 
+    const parsed = parseOptionTokens(optionTokens, { rejectDuplicates });
     return {
         pathTokens,
-        options: parseOptionTokens(optionTokens).options
+        options: parsed.options,
+        positionals: parsed.positionals
     };
 }
 
-export function parseOptionTokens(tokens) {
+export function splitRunTokens(tokens) {
+    const boundaries = tokens
+        .map((token, index) => (token === "--" ? index : -1))
+        .filter((index) => index !== -1);
+
+    if (boundaries.length > 1) {
+        throw new AxError("run accepts at most one '--' argument boundary", 2);
+    }
+
+    const boundaryIndex = boundaries[0] ?? -1;
+    const beforeBoundary = boundaryIndex === -1
+        ? tokens
+        : tokens.slice(0, boundaryIndex);
+    const afterBoundary = boundaryIndex === -1
+        ? []
+        : tokens.slice(boundaryIndex + 1);
+    const before = splitCommandTokens(beforeBoundary, {
+        rejectDuplicates: boundaryIndex !== -1
+    });
+
+    if (before.positionals.length > 0) {
+        throw new AxError(
+            `unexpected positional run argument '${before.positionals[0]}'`,
+            2
+        );
+    }
+
+    const capability = parseOptionTokens(afterBoundary, {
+        rejectDuplicates: boundaryIndex !== -1
+    });
+    if (capability.positionals.length > 0) {
+        throw new AxError(
+            `capability arguments after '--' must use --name value form; found '${capability.positionals[0]}'`,
+            2
+        );
+    }
+
+    return {
+        pathTokens: before.pathTokens,
+        frameworkOptions: before.options,
+        boundaryOptions: capability.options,
+        hasBoundary: boundaryIndex !== -1
+    };
+}
+
+export function parseOptionTokens(tokens, { rejectDuplicates = false } = {}) {
     const options = {};
     const positionals = [];
 
@@ -50,21 +97,33 @@ export function parseOptionTokens(tokens) {
         if (equalsIndex !== -1) {
             const key = normalized.slice(0, equalsIndex);
             const value = normalized.slice(equalsIndex + 1);
+            assertOptionNotDuplicate(options, key, rejectDuplicates);
             options[key] = parseLiteral(value);
             continue;
         }
 
         const next = tokens[index + 1];
         if (next === undefined || next.startsWith("--")) {
+            assertOptionNotDuplicate(options, normalized, rejectDuplicates);
             options[normalized] = true;
             continue;
         }
 
+        assertOptionNotDuplicate(options, normalized, rejectDuplicates);
         options[normalized] = parseLiteral(next);
         index += 1;
     }
 
     return { options, positionals };
+}
+
+function assertOptionNotDuplicate(options, key, rejectDuplicates) {
+    if (rejectDuplicates && Object.prototype.hasOwnProperty.call(options, key)) {
+        throw new AxError(
+            `option '--${key}' appears more than once in the same argument section`,
+            2
+        );
+    }
 }
 
 // Only the literal strings "true" and "false" are coerced to booleans;

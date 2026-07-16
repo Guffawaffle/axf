@@ -2,8 +2,6 @@ import { spawnSync } from "node:child_process";
 import { resolveCliLaunchPlan } from "../../src/core/cli-launch-plan.js";
 import { prepareCommandInvocation } from "../../src/core/command-invocation.js";
 
-const FRAMEWORK_ARG_KEYS = new Set(["json", "allow-draft", "any-lifecycle"]);
-
 export async function execute(resolved, ctx = {}) {
   const { capability, args } = resolved;
   const launchPlan = resolveCliLaunchPlan(capability, {
@@ -80,7 +78,6 @@ function buildLaunchMeta(capability, invocation, launchPlan) {
 function argsToCliArgs(args, capability) {
   const argMap = capability?.argMap ?? null;
   return Object.entries(args)
-    .filter(([key]) => !FRAMEWORK_ARG_KEYS.has(key))
     .flatMap(([key, value]) => {
       const flag = argMap?.[key] ?? `--${key}`;
       if (value === true) {

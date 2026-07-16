@@ -6,7 +6,11 @@ import { executeResolvedCapability } from "../core/executor.js";
 import { inspectRegistry } from "../core/doctor.js";
 import { loadAdapters } from "../core/adapter-loader.js";
 import { findWorkspacePair } from "../core/workspace.js";
-import { parseOptionTokens, splitCommandTokens } from "./options.js";
+import {
+  parseOptionTokens,
+  splitCommandTokens,
+  splitRunTokens,
+} from "./options.js";
 import { AxError } from "../core/errors.js";
 import { resolveCliLaunchPlan } from "../core/cli-launch-plan.js";
 import { prepareCommandInvocation } from "../core/command-invocation.js";
@@ -24,6 +28,10 @@ import {
   selectCapabilities,
 } from "../core/discovery.js";
 import { integrateCodex } from "../core/codex-integration.js";
+import {
+  AXF_ROOT_OPTIONS,
+  partitionRunOptions,
+} from "../core/framework-options.js";
 
 const COMMANDS = new Set([
   "list",
@@ -45,8 +53,9 @@ export async function main(argv, env = {}) {
   const cwd = env.cwd ?? process.cwd();
   const processEnv = env.env ?? process.env;
 
-  // Pull --workspace out of argv before command dispatch so every
-  // subcommand gets workspace resolution for free.
+  // Pull root controls out before dispatch. During `run`, unprefixed root-like
+  // flags become capability-owned after the command starts; other subcommands
+  // have no downstream argument owner and retain legacy placement support.
   const {
     argv: rest1,
     workspace,
@@ -158,72 +167,59 @@ export async function main(argv, env = {}) {
   }
 }
 
-// Extract `--workspace <path>` or `--workspace=<path>` from argv before
-// command dispatch. Other flags pass through untouched.
 function extractWorkspaceFlags(argv) {
   const out = [];
-  let workspace = null;
-  let registryWorkspace = null;
-  let executionWorkspace = null;
-  let projectRoot = null;
-  let executionRoot = null;
+  const roots = Object.fromEntries(
+    AXF_ROOT_OPTIONS.map(({ field }) => [field, null]),
+  );
+  let commandName = null;
+  let capabilityBoundaryStarted = false;
+
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
-    if (token === "--workspace") {
-      workspace = argv[i + 1];
-      i += 1;
+    const match = capabilityBoundaryStarted
+      ? null
+      : matchRootOption(token, { allowLegacy: commandName !== "run" });
+    if (match) {
+      const inlineValue = token.startsWith(`${match.flag}=`)
+        ? token.slice(match.flag.length + 1)
+        : null;
+      const value = inlineValue ?? argv[i + 1];
+      if (
+        value === undefined ||
+        value === "" ||
+        (inlineValue === null && value.startsWith("--"))
+      ) {
+        throw new AxError(`${match.flag} requires a path`, 2);
+      }
+      roots[match.field] = value;
+      if (inlineValue === null) i += 1;
       continue;
     }
-    if (token.startsWith("--workspace=")) {
-      workspace = token.slice("--workspace=".length);
-      continue;
-    }
-    if (token === "--registry-workspace") {
-      registryWorkspace = argv[i + 1];
-      i += 1;
-      continue;
-    }
-    if (token.startsWith("--registry-workspace=")) {
-      registryWorkspace = token.slice("--registry-workspace=".length);
-      continue;
-    }
-    if (token === "--execution-workspace") {
-      executionWorkspace = argv[i + 1];
-      i += 1;
-      continue;
-    }
-    if (token.startsWith("--execution-workspace=")) {
-      executionWorkspace = token.slice("--execution-workspace=".length);
-      continue;
-    }
-    if (token === "--project-root") {
-      projectRoot = argv[i + 1];
-      i += 1;
-      continue;
-    }
-    if (token.startsWith("--project-root=")) {
-      projectRoot = token.slice("--project-root=".length);
-      continue;
-    }
-    if (token === "--execution-root") {
-      executionRoot = argv[i + 1];
-      i += 1;
-      continue;
-    }
-    if (token.startsWith("--execution-root=")) {
-      executionRoot = token.slice("--execution-root=".length);
-      continue;
-    }
+
     out.push(token);
+    if (commandName === null) commandName = token;
+    if (token === "--") capabilityBoundaryStarted = true;
   }
+
   return {
     argv: out,
-    workspace,
-    registryWorkspace,
-    executionWorkspace,
-    projectRoot,
-    executionRoot,
+    ...roots,
   };
+}
+
+function matchRootOption(token, { allowLegacy }) {
+  for (const option of AXF_ROOT_OPTIONS) {
+    const names = [
+      `--${option.namespaced}`,
+      ...(allowLegacy ? [`--${option.legacy}`] : []),
+    ];
+    const flag = names.find(
+      (candidate) => token === candidate || token.startsWith(`${candidate}=`),
+    );
+    if (flag) return { field: option.field, flag };
+  }
+  return null;
 }
 
 async function listCommand(
@@ -563,15 +559,33 @@ async function runCommand(
   env = process.env,
   cwd = process.cwd(),
 ) {
-  const { pathTokens, options } = splitCommandTokens(tokens);
+  const {
+    pathTokens,
+    frameworkOptions,
+    boundaryOptions,
+    hasBoundary,
+  } = splitRunTokens(tokens);
   if (pathTokens.length === 0) {
     throw new AxError("run requires a capability id or CLI path", 2);
   }
-  warnIfDeprecatedAllowDraft(options);
+
+  const capability = registry.resolveInspectable(pathTokens).capability;
+  const partitioned = partitionRunOptions(
+    capability,
+    frameworkOptions,
+    { explicitBoundary: hasBoundary },
+  );
+  const capabilityArgs = hasBoundary
+    ? boundaryOptions
+    : partitioned.capabilityArgs;
+  const { controls } = partitioned;
+  if (controls.usedLegacyAllowDraft) {
+    warnIfDeprecatedAllowDraft({ "allow-draft": true });
+  }
 
   const resolved = resolveCapability(registry, pathTokens, {
-    args: options,
-    allowDraft: Boolean(options["any-lifecycle"] ?? options["allow-draft"]),
+    args: capabilityArgs,
+    allowDraft: controls.allowAnyLifecycle,
   });
   const runtime = buildRuntime(workspaces, env, cwd);
   const result = await executeResolvedCapability(resolved, {
@@ -579,7 +593,7 @@ async function runCommand(
     runtime,
   });
 
-  if (options.json) {
+  if (controls.json) {
     printJson({
       ...result,
       workspaces: summarizeWorkspaces(workspaces),
@@ -1278,19 +1292,24 @@ async function scoutCommand(rootDir, tokens, env = process.env) {
 function printHelp() {
   console.log(`axf framework prototype
 
-Global flags:
+Global root flags (unprefixed spellings must precede a run command):
   --project-root <path>         Canonical project root for manifest/adaptor discovery.
   --execution-root <path>       Canonical execution root for runtime cwd and caller execution.
   --workspace <path>            Legacy alias: set both project and execution roots.
   --registry-workspace <path>   Legacy alias for --project-root.
   --execution-workspace <path>  Legacy alias for --execution-root.
 
+Namespaced root flags:
+  --axf-project-root <path>     AXF project root; accepted before a run argument boundary.
+  --axf-execution-root <path>   AXF execution root; accepted before a run argument boundary.
+  --axf-workspace <path>        AXF alias that sets both roots.
+
 Usage:
     axf list [--compact] [--search <term>] [--side-effects <kind>] [--limit <n>] [--all|--any-lifecycle] [--json]
     axf guide [context|check|handoff] [--limit <n>] [--json]
     axf explain <id-or-path-or-family> [--any-lifecycle] [--json]
     axf inspect <id-or-path> [--json]
-    axf run <id-or-path> [--key value] [--json] [--any-lifecycle]
+    axf run <id-or-path> [AXF controls] [-- [--key value]...]
     axf init toolspace <name>
     axf init capability <fully-qualified-id>      (global.* | workspace.* | toolspace.*)
     axf init adapter <type>
@@ -1304,9 +1323,17 @@ Usage:
     axf doctor [--json]
     axf mcp
 
-Lifecycle flag:
-  --any-lifecycle        Allow non-active capabilities to run/list (canonical).
-  --allow-draft          Deprecated alias for --any-lifecycle (warns to stderr).
+Run controls:
+  --axf-json              Emit the AXF execution envelope as JSON.
+  --axf-any-lifecycle     Allow a non-active capability to run.
+  --                      Everything after this boundary is a schema-validated,
+                          mapped public capability argument (never raw argv).
+
+Compatibility flags:
+  --json                  AXF output unless the capability declares 'json'.
+  --any-lifecycle         AXF lifecycle control unless the capability declares it;
+                          remains canonical for list/explain discovery commands.
+  --allow-draft           Deprecated alias when not declared by the capability.
 
 Examples:
     axf list --compact --search lex
@@ -1314,6 +1341,7 @@ Examples:
     axf explain global.lex
     axf inspect echo say
     axf run echo say --message hello
+    axf run global.logs.query --axf-json -- --json --limit 20
     axf run toy echo say --message hello
     axf init toolspace demo
     axf init capability global.acme.status

@@ -247,10 +247,43 @@ execution root in this order:
 
 1. explicit `--project-root` and `--execution-root`
 2. `AXF_PROJECT_ROOT` and `AXF_EXECUTION_ROOT`
-3. legacy aliases: `--workspace`, `--registry-workspace`, `--execution-workspace`, `AXF_WORKSPACE`, `AXF_REGISTRY_WORKSPACE`, `AXF_EXECUTION_WORKSPACE`
-4. nearest `axf.workspace.json` from `cwd`
-5. nearest `axf.workspace.json` from the installed script location
-6. `cwd` fallback
+3. legacy CLI aliases: `--workspace`, `--registry-workspace`, `--execution-workspace`
+4. legacy environment aliases: `AXF_WORKSPACE`, `AXF_REGISTRY_WORKSPACE`, `AXF_EXECUTION_WORKSPACE`
+5. nearest `axf.workspace.json` from `cwd`
+6. nearest `axf.workspace.json` from the installed script location
+7. `cwd` fallback
+
+For `axf run`, unprefixed root flags are global only before the subcommand;
+after `run` they are capability-owned. Non-run commands retain their legacy
+placement because they have no downstream argument owner. The
+`--axf-project-root`, `--axf-execution-root`, and `--axf-workspace`
+spellings are accepted later in the AXF-controlled portion of a command.
+After an `axf run ... --` boundary, root-like names belong to the capability.
+
+### Run argument ownership
+
+AXF reserves the `--axf-*` namespace for framework controls and leaves
+natural public argument names to capabilities. Use an explicit boundary
+when the ownership should be visible in the command itself:
+
+```sh
+axf --project-root /repo run global.logs.query \
+  --axf-json --axf-any-lifecycle -- \
+  --json --limit 20 --workspace downstream-name
+```
+
+Options before `--` are AXF run controls. Options after `--` are public
+capability arguments: AXF still parses them, validates and coerces them with
+`argsSchema`, maps them through `argMap`, and executes them through the
+declared adapter. The boundary never enables raw or schema-bypassing argv.
+The same name may appear on both sides with different ownership, but a
+duplicate within either explicit section is rejected.
+
+Existing no-boundary invocations such as `axf run echo say --message hello`
+remain supported. In that compatibility form, legacy `--json`,
+`--any-lifecycle`, and `--allow-draft` remain AXF controls unless the
+capability explicitly declares the same argument. Use `--axf-json` and
+`--axf-any-lifecycle` when AXF ownership must be unambiguous.
 
 ### Agent-first discovery
 
@@ -402,7 +435,7 @@ axf init capability global.acme.status
 
 # 3. Edit the drafts, then:
 axf doctor
-axf run acme status --any-lifecycle
+axf run acme status --axf-any-lifecycle
 ```
 
 The four canonical prompts under [`prompts/`](prompts/) walk an agent

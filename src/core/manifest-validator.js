@@ -2,6 +2,11 @@
 // and the doctor (post-load reporting). Returns issues with severity:
 // "error" blocks loading in strict mode; "warning" never blocks.
 
+import {
+  AXF_OPTION_PREFIX,
+  isFrameworkReservedArgName,
+} from "./framework-options.js";
+
 const REQUIRED_CAPABILITY_FIELDS = [
   "manifestVersion",
   "id",
@@ -182,6 +187,25 @@ export function validateCapabilityManifest(manifest, label) {
       severity: "error",
       message: `${label}: argsSchema must be an object`,
     });
+  }
+
+  if (
+    manifest.argsSchema &&
+    typeof manifest.argsSchema === "object" &&
+    !Array.isArray(manifest.argsSchema)
+  ) {
+    const publicArgNames = new Set([
+      ...Object.keys(manifest.argsSchema.properties ?? {}),
+      ...Object.keys(manifest.defaults ?? {}),
+    ]);
+    for (const argName of publicArgNames) {
+      if (isFrameworkReservedArgName(argName)) {
+        issues.push({
+          severity: "error",
+          message: `${label}: capability arg '${argName}' uses the reserved '${AXF_OPTION_PREFIX}' framework namespace`,
+        });
+      }
+    }
   }
 
   if (manifest.defaults && typeof manifest.defaults !== "object") {

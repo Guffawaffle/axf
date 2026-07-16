@@ -82,17 +82,35 @@ The cli type adapter uses `capability.argMap` when constructing the
 provider command line. Public arg names are kept stable across providers;
 the provider flag changes underneath.
 
-### Reserved names
+### AXF option namespace and run boundary
 
-These public arg names are reserved by axf and rejected at family load:
+Common public names such as `json`, `workspace`, `all`, `search`, and
+`limit` are valid family arguments. AXF command-local flags do not reserve
+those names across unrelated subcommands.
 
-```text
-json, workspace, any-lifecycle, allow-draft, include-drafts, all,
-compact, search, side-effects, limit, intent
+AXF reserves only the `axf-` public argument prefix for its own CLI control
+plane. If a provider itself uses an `--axf-*` flag, expose it under a
+different public name and map back with `providerFlag`.
+
+Use `--` when a run needs an explicit ownership boundary:
+
+```sh
+axf run global.demo.query --axf-json -- --json --limit 20
 ```
 
-If a provider uses these, expose them under a different public name and
-map back via `providerFlag`.
+Before the boundary, only AXF run controls are accepted. After it, every
+token is a public capability argument. Those arguments still pass through
+the normal parser, `argsSchema` validation and coercion, `argMap`, policy
+evaluation, and adapter execution; they are not raw provider argv.
+The same spelling may appear once on each side because the sections have
+different owners (for example, AXF `--json` before and capability `--json`
+after). Repeating a name within either explicit section is rejected.
+
+For compatibility, runs without a boundary continue to accept capability
+arguments in their historical location. Legacy `--json`, `--any-lifecycle`,
+and `--allow-draft` spellings are treated as AXF controls only when the
+capability does not explicitly declare the same public argument. Prefer
+`--axf-json` and `--axf-any-lifecycle` for unambiguous AXF control.
 
 ## Materialization
 
@@ -164,9 +182,12 @@ axf scout --write  # update materialized manifests
 ```
 
 For `ax-inventory` imports, scout runs the declared `.ax` dispatcher with
-`list -Json`. Commands that expose framework-reserved public args, such
-as `all`, are emitted as standalone capability files so the family
-manifest remains loadable.
+`list -Json`. Common arguments such as `all` and `limit` remain in the
+generated family. If an older Scout version created a standalone capability
+as a reserved-name workaround, Scout warns that the file may shadow the new
+family import and leaves the file untouched for review. An imported public
+argument in the reserved `axf-` namespace is reported as an error; rename
+the public argument and retain the provider spelling with `providerFlag`.
 
 Provider command names are normalized to AXF-safe kebab-case command
 keys. For example, a provider command named `dist:win` is exposed as
