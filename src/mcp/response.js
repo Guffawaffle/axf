@@ -54,6 +54,7 @@ function projectStandardResponse(payload) {
     projected.capability = withoutNullFields(projected.capability);
 
     if (projected.ok) {
+      delete projected.args;
       delete projected.error;
       projected.meta = withoutSuccessTrace(projected.meta);
       omitEmptyField(projected, "meta");
