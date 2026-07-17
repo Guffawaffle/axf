@@ -102,6 +102,36 @@ Compact entries retain ID, summary, lifecycle, side effects, scope, source
 kind, layer, manifest path, owner, provider, family, and mount provenance.
 Full `list` output remains available when complete manifests are required.
 
+## Agent-facing response detail
+
+MCP responses default to `responseDetail: "standard"` because agents are the
+primary AXF consumer. Standard results retain capability data and the fields
+needed for safe decisions while removing legacy workspace aliases, echoed run
+input, empty metadata, and successful launch traces.
+
+Use the three named profiles deliberately:
+
+- `compact` returns the minimum safe operation result. Failures remain
+  actionable, and `inspect` still retains lifecycle, side effects, policies,
+  defaults, output modes, and the argument schema.
+- `standard` is the agent-first default.
+- `diagnostic` returns complete compatibility, provenance, workspace, adapter,
+  and invocation metadata.
+
+```json
+{
+  "operation": "run",
+  "responseDetail": "compact",
+  "target": { "id": "global.echo.say" },
+  "args": { "message": "hello" }
+}
+```
+
+Response projection applies only to AXF's envelope. Capability-owned `data`
+is never truncated, summarized, or otherwise transformed. The existing list
+`compact` option remains separate: it controls capability item shape, while
+`responseDetail` controls the surrounding MCP result.
+
 ## Missing-capability explanations
 
 Use `explain` rather than reconstructing registry internals:
