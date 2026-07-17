@@ -26,6 +26,11 @@ import {
   AXF_TOOL_DESCRIPTION,
   AXF_TOOL_NAME,
 } from "./contract.js";
+import {
+  AXF_RESPONSE_DETAILS,
+  DEFAULT_AXF_RESPONSE_DETAIL,
+  projectMcpResponse,
+} from "./response.js";
 
 const OPERATIONS = new Set(AXF_MCP_OPERATIONS);
 
@@ -42,43 +47,58 @@ export async function performOperation(rawInput, options = {}) {
   const fallbackOperation =
     typeof rawInput?.operation === "string" ? rawInput.operation : "unknown";
   let workspaceSummary = null;
+  let responseDetail = DEFAULT_AXF_RESPONSE_DETAIL;
 
   try {
     const input = validateInput(rawInput);
+    responseDetail = input.responseDetail;
     const context = await createContext(input, options);
     workspaceSummary = context.workspaceSummary;
 
+    let payload;
     switch (input.operation) {
       case "help":
-        return performHelp(context);
+        payload = performHelp(context);
+        break;
       case "list":
-        return performList(context);
+        payload = performList(context);
+        break;
       case "guide":
-        return await performGuide(context);
+        payload = await performGuide(context);
+        break;
       case "explain":
-        return performExplain(context);
+        payload = performExplain(context);
+        break;
       case "inspect":
-        return await performInspect(context);
+        payload = await performInspect(context);
+        break;
       case "run":
-        return await performRun(context);
+        payload = await performRun(context);
+        break;
       case "doctor":
-        return await performDoctor(context);
+        payload = await performDoctor(context);
+        break;
       case "scout_check":
-        return await performScoutCheck(context);
+        payload = await performScoutCheck(context);
+        break;
       default:
         throw new MCPInputError(
           buildOperationErrorMessage(),
           buildOperationSelectionErrorDetails(),
         );
     }
+    return projectMcpResponse(payload, responseDetail);
   } catch (error) {
-    return attachWorkspace(
-      {
-        ok: false,
-        operation: fallbackOperation,
-        error: formatOperationError(error, fallbackOperation),
-      },
-      workspaceSummary,
+    return projectMcpResponse(
+      attachWorkspace(
+        {
+          ok: false,
+          operation: fallbackOperation,
+          error: formatOperationError(error, fallbackOperation),
+        },
+        workspaceSummary,
+      ),
+      responseDetail,
     );
   }
 }
@@ -96,6 +116,16 @@ function performHelp(context) {
       contract: {
         summary:
           "AXF MCP exposes one tool named axf as an agent-safe router over the current AXF registry.",
+        responseDetail: {
+          default: DEFAULT_AXF_RESPONSE_DETAIL,
+          profiles: [...AXF_RESPONSE_DETAILS],
+          compact:
+            "Minimum safe agent result with actionable failures and unchanged capability data.",
+          standard:
+            "Agent-first canonical result without legacy aliases or successful execution traces.",
+          diagnostic:
+            "Complete compatibility, provenance, workspace, and invocation metadata.",
+        },
         capabilitiesAreSeparateTools: false,
         routingNote:
           "Capabilities such as global.echo.say are discovered through the single axf MCP tool, not exposed as separate MCP tools.",
@@ -549,6 +579,7 @@ function validateInput(value) {
     "allowAnyLifecycle",
   );
   const compact = optionalBoolean(value.compact, "compact");
+  const responseDetail = optionalResponseDetail(value.responseDetail);
   const search = optionalString(value.search, "search");
   const sideEffects = optionalString(value.sideEffects, "sideEffects");
   const intent = optionalString(value.intent, "intent");
@@ -567,12 +598,23 @@ function validateInput(value) {
     includeDrafts,
     allowAnyLifecycle,
     compact,
+    responseDetail,
     search,
     sideEffects,
     intent,
     query,
     limit,
   };
+}
+
+function optionalResponseDetail(value) {
+  if (value === undefined) return DEFAULT_AXF_RESPONSE_DETAIL;
+  if (typeof value !== "string" || !AXF_RESPONSE_DETAILS.includes(value)) {
+    throw new MCPInputError(
+      `responseDetail must be one of: ${AXF_RESPONSE_DETAILS.join(", ")}`,
+    );
+  }
+  return value;
 }
 
 function validateTarget(value, operation) {

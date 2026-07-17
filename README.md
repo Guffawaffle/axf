@@ -304,6 +304,28 @@ validation, and handoff entrypoints without executing them. Compact list
 entries retain lifecycle, side effects, and source provenance while omitting
 full schemas and execution targets until `inspect`.
 
+AI agents are the primary consumer of MCP results, so AXF defaults to
+`responseDetail: "standard"`: capability data and safety-relevant fields stay
+intact while compatibility-only workspace aliases, echoed run input, empty
+metadata, and successful invocation traces are omitted. Request
+`responseDetail: "compact"` for the smallest safe result or
+`responseDetail: "diagnostic"` when investigating provenance, workspace
+binding, or launch behavior. Response detail never truncates or transforms a
+capability's `data`.
+
+```json
+{
+  "operation": "run",
+  "responseDetail": "compact",
+  "target": { "id": "global.lex.status" },
+  "args": {}
+}
+```
+
+The `compact` list option and `responseDetail` are intentionally separate:
+`compact` selects summarized capability entries, while `responseDetail`
+controls the surrounding agent-facing response envelope.
+
 See [Agent Discovery and Workflow Guide](docs/15-agent-discovery-and-workflow-guide.md)
 for recommendation declarations, missing-capability diagnostics, and CLI/MCP
 examples.

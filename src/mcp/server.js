@@ -7,6 +7,10 @@ import {
   AXF_TOOL_NAME,
 } from "./contract.js";
 import { performOperation } from "./operations.js";
+import {
+  AXF_RESPONSE_DETAILS,
+  DEFAULT_AXF_RESPONSE_DETAIL,
+} from "./response.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -74,6 +78,13 @@ export const AXF_TOOL = {
         type: "boolean",
         description:
           "Return compact capability summaries instead of full manifests for operation=list.",
+      },
+      responseDetail: {
+        type: "string",
+        enum: AXF_RESPONSE_DETAILS,
+        default: DEFAULT_AXF_RESPONSE_DETAIL,
+        description:
+          "Agent-facing response detail. standard is the context-efficient default; compact returns the minimum safe operation result; diagnostic returns complete compatibility and execution metadata.",
       },
       search: {
         type: "string",
@@ -312,7 +323,7 @@ function toolResult(payload) {
     content: [
       {
         type: "text",
-        text: `${JSON.stringify(payload, null, 2)}\n`,
+        text: JSON.stringify(payload),
       },
     ],
     structuredContent: payload,

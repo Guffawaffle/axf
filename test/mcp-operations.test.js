@@ -244,9 +244,8 @@ test("axf MCP inspect surfaces split registry and execution workspaces", async (
     assert.equal(result.ok, true);
     assert.equal(result.projectRoot.root, registryRoot);
     assert.equal(result.executionRoot.root, executionRoot);
-    assert.equal(result.workspaces.projectRoot.root, registryRoot);
-    assert.equal(result.workspaces.executionRoot.root, executionRoot);
-    assert.equal(result.executionWorkspace.root, executionRoot);
+    assert.equal("workspaces" in result, false);
+    assert.equal("executionWorkspace" in result, false);
     assert.equal(result.launchPlan.cwd, executionRoot);
     assert.equal(
       result.launchPlan.targetPath,
@@ -327,9 +326,8 @@ test("axf MCP inspect accepts projectRoot and executionRoot aliases", async () =
     assert.equal(result.ok, true);
     assert.equal(result.projectRoot.root, registryRoot);
     assert.equal(result.executionRoot.root, executionRoot);
-    assert.equal(result.workspaces.projectRoot.root, registryRoot);
-    assert.equal(result.workspaces.executionRoot.root, executionRoot);
-    assert.equal(result.executionWorkspace.root, executionRoot);
+    assert.equal("workspaces" in result, false);
+    assert.equal("executionWorkspace" in result, false);
     assert.equal(result.launchPlan.cwd, executionRoot);
     assert.equal(
       result.launchPlan.targetPath,
@@ -544,6 +542,7 @@ test("axf run uses AXF's existing execution path, not raw shell fallback", async
     workspace: repoRoot,
     target: { path: ["echo", "say"] },
     args: { message: "path check" },
+    responseDetail: "diagnostic",
   });
 
   assert.equal(result.ok, true);
@@ -563,7 +562,8 @@ test("axf doctor returns structured diagnostics", async () => {
   assert.equal(result.operation, "doctor");
   assert.equal(Array.isArray(result.issues), true);
   assert.ok(result.runtime);
-  assert.ok(result.workspace);
+  assert.ok(result.projectRoot);
+  assert.equal("workspace" in result, false);
 });
 
 test("axf scout_check stays read only", async () => {

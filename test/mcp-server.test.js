@@ -30,6 +30,14 @@ test("tools/list advertises exactly one tool named axf", async () => {
     "doctor",
     "scout_check",
   ]);
+  assert.deepEqual(
+    response.tools[0].inputSchema.properties.responseDetail.enum,
+    ["compact", "standard", "diagnostic"],
+  );
+  assert.equal(
+    response.tools[0].inputSchema.properties.responseDetail.default,
+    "standard",
+  );
 });
 
 test("tools/call help returns the single-tool router contract", async () => {
@@ -74,6 +82,11 @@ test("tools/call routes run through the single axf tool", async () => {
   assert.equal(response.structuredContent.ok, true);
   assert.equal(response.structuredContent.operation, "run");
   assert.equal(response.structuredContent.data, "server path");
+  assert.equal(
+    response.content[0].text,
+    JSON.stringify(response.structuredContent),
+  );
+  assert.equal(response.content[0].text.includes("\n"), false);
 });
 
 test("stdio MCP entrypoint serves the single axf tool", async () => {
