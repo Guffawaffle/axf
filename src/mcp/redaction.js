@@ -48,6 +48,12 @@ const SENSITIVE_SCHEMA_VALUE_FIELDS = new Set([
   "examples",
 ]);
 
+const SERIALIZED_JSON_MEMBER_PATTERN =
+  /((?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/gu;
+
+const SENSITIVE_HEADER_PATTERN =
+  /(^|[\r\n])([ \t]*(?:authorization|proxy-authorization|cookie|set-cookie|x[-_ ]?api[-_ ]?key|x[-_ ]?auth[-_ ]?token)\s*:\s*)[^\r\n]*/giu;
+
 export function redactMcpResponse(projected, source = projected) {
   return redactValue(projected, collectSensitiveValues(source));
 }
@@ -131,6 +137,18 @@ function redactString(value, sensitiveValues) {
     .replace(
       /(\b(?:api[_ -]?key|connection[_ -]?string|passphrase|passw(?:or)?d|pwd|secret(?:[_ -]?access[_ -]?key)?|token)\s*=\s*)("(?:""|[^"])*"|'(?:''|[^'])*'|\{[^}]*\}|[^;,\s]+)/giu,
       `$1${REDACTED_VALUE}`,
+    )
+    .replace(
+      SERIALIZED_JSON_MEMBER_PATTERN,
+      (match, prefix, doubleQuotedKey, singleQuotedKey, serializedValue) =>
+        isSensitiveField(doubleQuotedKey ?? singleQuotedKey)
+          ? `${prefix}${serializedValue[0]}${REDACTED_VALUE}${serializedValue.at(-1)}`
+          : match,
+    )
+    .replace(
+      SENSITIVE_HEADER_PATTERN,
+      (_, lineBoundary, prefix) =>
+        `${lineBoundary}${prefix}${REDACTED_VALUE}`,
     );
 
   for (const sensitiveValue of [...sensitiveValues].sort(
