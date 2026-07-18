@@ -401,6 +401,7 @@ test("CLI and MCP expose the same compact list, guide, explain, and inspect exam
       projectRoot: root,
       compact: true,
       search: "context",
+      responseDetail: "standard",
     });
     assert.deepEqual(cliList.capabilities, mcpList.capabilities);
 
@@ -413,6 +414,7 @@ test("CLI and MCP expose the same compact list, guide, explain, and inspect exam
       operation: "guide",
       projectRoot: root,
       intent: "context",
+      responseDetail: "standard",
     });
     assert.deepEqual(cliGuide.recommendations, mcpGuide.recommendations);
 
@@ -431,6 +433,7 @@ test("CLI and MCP expose the same compact list, guide, explain, and inspect exam
       operation: "explain",
       projectRoot: root,
       query: "global.demo",
+      responseDetail: "standard",
     });
     assert.equal(cliExplain.status, mcpExplain.status);
     assert.deepEqual(cliExplain.suggestions, mcpExplain.suggestions);
@@ -439,6 +442,7 @@ test("CLI and MCP expose the same compact list, guide, explain, and inspect exam
       operation: "inspect",
       projectRoot: root,
       target: { id: "global.demo.context" },
+      responseDetail: "standard",
     });
     assert.equal(mcpInspect.examples.inspect.cli, "axf inspect global.demo.context");
     assert.equal(mcpInspect.examples.run.mcp.args.topic, "release");
@@ -493,6 +497,7 @@ test("CLI and MCP share machine-pack discovery while execution uses a separate c
         projectRoot,
         executionRoot,
         compact: true,
+        responseDetail: "standard",
       },
       { cwd: executionRoot, env },
     );

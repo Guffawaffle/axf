@@ -1,10 +1,12 @@
+import { redactMcpResponse } from "./redaction.js";
+
 export const AXF_RESPONSE_DETAILS = Object.freeze([
   "compact",
   "standard",
   "diagnostic",
 ]);
 
-export const DEFAULT_AXF_RESPONSE_DETAIL = "standard";
+export const DEFAULT_AXF_RESPONSE_DETAIL = "compact";
 
 const LEGACY_WORKSPACE_FIELDS = Object.freeze([
   "workspace",
@@ -27,12 +29,18 @@ export function projectMcpResponse(
   payload,
   responseDetail = DEFAULT_AXF_RESPONSE_DETAIL,
 ) {
-  if (responseDetail === "diagnostic") return payload;
+  let projected;
+  if (responseDetail === "diagnostic") {
+    projected = payload;
+  } else {
+    const standard = projectStandardResponse(payload);
+    projected =
+      responseDetail === "compact"
+        ? projectCompactResponse(standard)
+        : standard;
+  }
 
-  const standard = projectStandardResponse(payload);
-  return responseDetail === "compact"
-    ? projectCompactResponse(standard)
-    : standard;
+  return redactMcpResponse(projected, payload);
 }
 
 function projectStandardResponse(payload) {
@@ -51,16 +59,17 @@ function projectStandardResponse(payload) {
 
   if (projected.operation === "run") {
     delete projected.input;
+    delete projected.args;
     projected.capability = withoutNullFields(projected.capability);
 
     if (projected.ok) {
-      delete projected.args;
       delete projected.error;
-      projected.meta = withoutSuccessTrace(projected.meta);
+      projected.meta = withoutInvocationTrace(projected.meta);
       omitEmptyField(projected, "meta");
     } else {
       delete projected.data;
-      omitNullField(projected, "meta");
+      projected.meta = withoutInvocationTrace(projected.meta);
+      omitEmptyField(projected, "meta");
     }
   }
 
@@ -72,6 +81,18 @@ function projectCompactResponse(payload) {
     ok: payload.ok,
     operation: payload.operation,
   };
+
+  if (payload.ok === false && payload.error) {
+    if (payload.operation === "run" && isRecord(payload.capability)) {
+      base.capability = pickAgentValues(payload.capability, [
+        "id",
+        "lifecycleState",
+      ]);
+      copyAgentValue(base, payload, "meta");
+    }
+    copyAgentValue(base, payload, "error");
+    return withCompactContext(base, payload);
+  }
 
   switch (payload.operation) {
     case "help":
@@ -121,6 +142,7 @@ function compactList(base, payload) {
   copyAgentValue(base, payload, "total");
   copyAgentValue(base, payload, "count");
   copyAgentValue(base, payload, "truncated");
+  copyAgentValue(base, payload.filters ?? {}, "limit");
   return withCompactContext(base, payload);
 }
 
@@ -233,6 +255,7 @@ function summarizeCapability(capability) {
     "sideEffects",
     "sourceKind",
     "provider",
+    "provenance",
   ]);
 }
 
@@ -247,7 +270,7 @@ function withCompactContext(projected, payload) {
   return projected;
 }
 
-function withoutSuccessTrace(meta) {
+function withoutInvocationTrace(meta) {
   if (!isRecord(meta)) return meta;
   return Object.fromEntries(
     Object.entries(meta).filter(

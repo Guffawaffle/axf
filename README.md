@@ -305,13 +305,14 @@ entries retain lifecycle, side effects, and source provenance while omitting
 full schemas and execution targets until `inspect`.
 
 AI agents are the primary consumer of MCP results, so AXF defaults to
-`responseDetail: "standard"`: capability data and safety-relevant fields stay
-intact while compatibility-only workspace aliases, echoed run input, empty
-metadata, and successful invocation traces are omitted. Request
-`responseDetail: "compact"` for the smallest safe result or
-`responseDetail: "diagnostic"` when investigating provenance, workspace
-binding, or launch behavior. Response detail never truncates or transforms a
-capability's `data`.
+`responseDetail: "compact"`: the deterministic minimum safe envelope with
+capability data, actionable errors, warnings, and required safety state.
+Request `responseDetail: "standard"` for an expanded canonical result or
+`responseDetail: "diagnostic"` explicitly when investigating provenance,
+workspace binding, or launch behavior. Invocation traces stay out of normal
+success and failure results. Diagnostic framework metadata is redacted for
+sensitive field names and values. Response detail never truncates, redacts, or
+otherwise transforms capability-owned `data`.
 
 ```json
 {
@@ -324,7 +325,24 @@ capability's `data`.
 
 The `compact` list option and `responseDetail` are intentionally separate:
 `compact` selects summarized capability entries, while `responseDetail`
-controls the surrounding agent-facing response envelope.
+controls the surrounding agent-facing response envelope. A default compact
+MCP `list` response is independently bounded to 25 results when `limit` is
+omitted; this does not enable the list item `compact` option. Supply an
+explicit `limit` to replace that bound, or explicitly request `standard` or
+`diagnostic` without a limit to opt out of the default bound.
+
+AXF 2.0 changes the implicit MCP response from the pre-2.0 rich envelope to
+`compact`. Callers that consume provenance or launch metadata must request
+`diagnostic`; callers that need the expanded result without invocation traces
+can request `standard`.
+
+AXF project and execution roots are filesystem discovery/execution bindings,
+not tenant, repository, workspace, grant, or authorization evidence. Ambient
+root environment variables remain compatibility/configuration inputs only;
+AXF never treats them as authority. Security-sensitive hosts should pass roots
+explicitly and authorize the operation before invoking AXF. Provider-owned
+identity and authorization stay with the provider; AXF does not require Lex or
+reconstruct Lex authority.
 
 See [Agent Discovery and Workflow Guide](docs/15-agent-discovery-and-workflow-guide.md)
 for recommendation declarations, missing-capability diagnostics, and CLI/MCP
