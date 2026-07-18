@@ -152,7 +152,8 @@ for (const payload of operationPayloads) {
     const standard = projectMcpResponse(payload, "standard");
     const compact = projectMcpResponse(payload, "compact");
 
-    assert.equal(diagnostic, payload);
+    assert.notEqual(diagnostic, payload);
+    assert.deepEqual(diagnostic, payload);
     assert.equal(standard.ok, payload.ok);
     assert.equal(standard.operation, payload.operation);
     assert.equal("workspace" in standard, false);
@@ -214,7 +215,7 @@ test("run profiles preserve data while removing successful execution traces", ()
   assert.equal("args" in compact, false);
 });
 
-test("compact failures retain actionable errors and execution diagnostics", () => {
+test("compact failures retain actionable errors without invocation traces", () => {
   const payload = {
     ok: false,
     operation: "run",
@@ -228,29 +229,113 @@ test("compact failures retain actionable errors and execution diagnostics", () =
   };
 
   const compact = projectMcpResponse(payload, "compact");
+  const standard = projectMcpResponse(payload, "standard");
 
   assert.deepEqual(compact.error, payload.error);
-  assert.deepEqual(compact.meta, payload.meta);
+  assert.deepEqual(compact.meta, { status: 2 });
+  assert.equal("args" in compact, false);
+  assert.equal("args" in standard, false);
 });
 
-test("standard is the agent-first default and materially reduces a run result", async () => {
+test("compact is the agent-first default and materially reduces a run result", async () => {
   const input = {
     operation: "run",
     workspace: repoRoot,
     target: { id: "global.echo.say" },
     args: { message: "context budget" },
   };
-  const standard = await performOperation(input);
+  const compact = await performOperation(input);
   const diagnostic = await performOperation({
     ...input,
     responseDetail: "diagnostic",
   });
 
-  assert.equal(standard.data, diagnostic.data);
-  assert.equal("workspace" in standard, false);
+  assert.equal(compact.data, diagnostic.data);
+  assert.equal("workspace" in compact, false);
   assert.ok(
-    JSON.stringify(standard).length < JSON.stringify(diagnostic).length * 0.5,
+    JSON.stringify(compact).length < JSON.stringify(diagnostic).length * 0.5,
   );
+});
+
+test("all profiles redact framework metadata without transforming capability data", () => {
+  const secret = "swordfish-credential";
+  const data = { password: secret, result: "provider-owned" };
+  const payload = {
+    ok: false,
+    operation: "run",
+    capability: { id: "global.demo.run", lifecycleState: "active" },
+    input: { path: ["demo", "run"] },
+    args: { password: secret, accessToken: secret },
+    data,
+    error: {
+      code: "EXECUTION_FAILED",
+      message: `provider rejected password ${secret}`,
+    },
+    meta: {
+      command: "demo",
+      args: ["--password", secret],
+      authorization: `Bearer ${secret}`,
+      connection: `postgres://worker:${secret}@localhost/axf`,
+      providerEnvelope: { data: { password: secret } },
+      status: 2,
+    },
+    ...workspaceMetadata,
+  };
+
+  for (const detail of ["compact", "standard", "diagnostic"]) {
+    const projected = projectMcpResponse(payload, detail);
+    const { data: projectedData, ...frameworkEnvelope } = projected;
+    assert.equal(JSON.stringify(frameworkEnvelope).includes(secret), false);
+    if (detail === "diagnostic") {
+      assert.equal(projectedData, data);
+      assert.equal(projected.args.password, "[REDACTED]");
+      assert.equal(projected.meta.authorization, "[REDACTED]");
+      assert.match(projected.meta.connection, /\[REDACTED\]/);
+      assert.equal(
+        projected.meta.providerEnvelope.data.password,
+        "[REDACTED]",
+      );
+    }
+  }
+
+  assert.equal(data.password, secret);
+});
+
+test("redaction preserves sensitive argument schema declarations", () => {
+  const payload = {
+    ok: true,
+    operation: "inspect",
+    capability: {
+      id: "global.demo.run",
+      argsSchema: {
+        type: "object",
+        properties: {
+          accessToken: {
+            type: "string",
+            description: "Provider token",
+            example: "swordfish-credential",
+          },
+        },
+      },
+      defaults: { accessToken: "swordfish-credential" },
+    },
+  };
+
+  const diagnostic = projectMcpResponse(payload, "diagnostic");
+
+  assert.equal(
+    diagnostic.capability.argsSchema.properties.accessToken.type,
+    "string",
+  );
+  assert.equal(
+    diagnostic.capability.argsSchema.properties.accessToken.description,
+    "Provider token",
+  );
+  assert.equal(
+    diagnostic.capability.argsSchema.properties.accessToken.example,
+    "[REDACTED]",
+  );
+  assert.equal(diagnostic.capability.defaults.accessToken, "[REDACTED]");
 });
 
 test("invalid response detail fails closed with a schema-guided error", async () => {

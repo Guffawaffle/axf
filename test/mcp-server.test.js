@@ -36,7 +36,7 @@ test("tools/list advertises exactly one tool named axf", async () => {
   );
   assert.equal(
     response.tools[0].inputSchema.properties.responseDetail.default,
-    "standard",
+    "compact",
   );
 });
 
@@ -49,6 +49,7 @@ test("tools/call help returns the single-tool router contract", async () => {
       arguments: {
         operation: "help",
         workspace: repoRoot,
+        responseDetail: "standard",
       },
     },
   });

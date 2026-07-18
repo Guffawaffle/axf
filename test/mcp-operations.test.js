@@ -31,6 +31,7 @@ test("axf help explains the single-tool router contract", async () => {
   const result = await performOperation({
     operation: "help",
     workspace: repoRoot,
+    responseDetail: "standard",
   });
 
   assert.equal(result.ok, true);
@@ -80,11 +81,66 @@ test("axf list returns discovered capabilities", async () => {
   );
 });
 
+test("default compact list responses are bounded independently of item shape", async () => {
+  const projectRoot = await tempAxfRoot("axf-mcp-bounded-list-");
+  const commands = Object.fromEntries(
+    Array.from({ length: 30 }, (_, index) => [
+      `task-${String(index).padStart(2, "0")}`,
+      {
+        summary: `Bulk task ${index}`,
+        executionTarget: { handler: "echo.say" },
+        args: {},
+        sideEffects: "none",
+      },
+    ]),
+  );
+  await writeFamily(projectRoot, "bulk", {
+    manifestVersion: "axf/v0",
+    family: "bulk",
+    scope: "global",
+    provider: "bulk",
+    adapterType: "internal",
+    lifecycleState: "active",
+    commands,
+  });
+
+  const bounded = await performOperation({
+    operation: "list",
+    workspace: projectRoot,
+    search: "global.bulk",
+  });
+  const explicitLimit = await performOperation({
+    operation: "list",
+    workspace: projectRoot,
+    search: "global.bulk",
+    limit: 7,
+  });
+  const expanded = await performOperation({
+    operation: "list",
+    workspace: projectRoot,
+    search: "global.bulk",
+    responseDetail: "standard",
+  });
+
+  assert.equal(bounded.total, 30);
+  assert.equal(bounded.count, 25);
+  assert.equal(bounded.limit, 25);
+  assert.equal(bounded.truncated, true);
+  assert.equal(bounded.capabilities.length, 25);
+  assert.equal(explicitLimit.count, 7);
+  assert.equal(explicitLimit.limit, 7);
+  assert.equal(expanded.count, 30);
+  assert.equal(expanded.truncated, false);
+  assert.equal(expanded.filters.compact, false);
+  assert.equal(expanded.filters.limit, null);
+});
+
 test("axf inspect returns capability metadata", async () => {
   const result = await performOperation({
     operation: "inspect",
     workspace: repoRoot,
     target: { id: "global.echo.say" },
+    responseDetail: "standard",
   });
 
   assert.equal(result.ok, true);
@@ -131,6 +187,7 @@ test("axf inspect preserves synthesized warnings/details in MCP responses", asyn
     operation: "inspect",
     workspace: root,
     target: { id: "global.demo.status" },
+    responseDetail: "standard",
   });
 
   assert.equal(result.ok, true);
@@ -166,6 +223,7 @@ test("axf MCP inspect shows optional machine family provenance", async () => {
       operation: "inspect",
       workspace: projectRoot,
       target: { id: "global.shared.status" },
+      responseDetail: "standard",
     },
     {
       env: { ...process.env, AXF_MACHINE_ROOT: machineRoot },
@@ -239,6 +297,7 @@ test("axf MCP inspect surfaces split registry and execution workspaces", async (
       registryWorkspace: registryRoot,
       executionWorkspace: executionRoot,
       target: { id: "global.demo.inspect-split" },
+      responseDetail: "standard",
     });
 
     assert.equal(result.ok, true);
@@ -321,6 +380,7 @@ test("axf MCP inspect accepts projectRoot and executionRoot aliases", async () =
       projectRoot: registryRoot,
       executionRoot,
       target: { id: "global.demo.inspect-alias" },
+      responseDetail: "standard",
     });
 
     assert.equal(result.ok, true);
@@ -557,6 +617,7 @@ test("axf doctor returns structured diagnostics", async () => {
   const result = await performOperation({
     operation: "doctor",
     workspace: repoRoot,
+    responseDetail: "standard",
   });
 
   assert.equal(result.operation, "doctor");
@@ -574,5 +635,5 @@ test("axf scout_check stays read only", async () => {
 
   assert.equal(result.operation, "scout_check");
   assert.equal(result.readOnly, true);
-  assert.equal(Array.isArray(result.changes), true);
+  assert.equal("changes" in result, false);
 });

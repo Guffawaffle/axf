@@ -104,19 +104,22 @@ Full `list` output remains available when complete manifests are required.
 
 ## Agent-facing response detail
 
-MCP responses default to `responseDetail: "standard"` because agents are the
-primary AXF consumer. Standard results retain capability data and the fields
-needed for safe decisions while removing legacy workspace aliases, echoed run
-input, empty metadata, and successful launch traces.
+MCP responses default to `responseDetail: "compact"` because agents are the
+primary AXF consumer. Compact results retain capability data, actionable
+errors, warnings, and the fields needed for safe decisions while omitting
+compatibility metadata and invocation traces.
 
 Use the three named profiles deliberately:
 
 - `compact` returns the minimum safe operation result. Failures remain
   actionable, and `inspect` still retains lifecycle, side effects, policies,
-  defaults, output modes, and the argument schema.
-- `standard` is the agent-first default.
-- `diagnostic` returns complete compatibility, provenance, workspace, adapter,
-  and invocation metadata.
+  defaults, output modes, and the argument schema. This is the agent-first
+  default.
+- `standard` returns the expanded canonical result without legacy aliases or
+  invocation traces.
+- `diagnostic` explicitly returns compatibility, provenance, workspace,
+  adapter, and invocation metadata. Sensitive framework fields and values are
+  redacted.
 
 ```json
 {
@@ -128,9 +131,24 @@ Use the three named profiles deliberately:
 ```
 
 Response projection applies only to AXF's envelope. Capability-owned `data`
-is never truncated, summarized, or otherwise transformed. The existing list
-`compact` option remains separate: it controls capability item shape, while
-`responseDetail` controls the surrounding MCP result.
+is never truncated, summarized, redacted, or otherwise transformed. The
+existing list `compact` option remains separate: it controls capability item
+shape, while `responseDetail` controls the surrounding MCP result. When a
+compact MCP `list` response omits `limit`, AXF independently bounds the result
+to 25 entries. An explicit `limit` replaces that bound. Explicit `standard` or
+`diagnostic` detail without a limit opts out and returns the complete matching
+selection.
+
+AXF 2.0 changes the implicit MCP response from the pre-2.0 rich envelope to
+`compact`. Request `diagnostic` wherever a caller deliberately consumes
+provenance or launch metadata.
+
+Project and execution roots identify filesystem bindings, not security
+principals. Environment-provided roots are compatibility/configuration inputs
+and are never proof of tenant, repository, workspace, grant, or authorization.
+Hosts that enforce those concepts must authorize first, pass explicit roots,
+and let the provider retain ownership of its identity contract. AXF neither
+depends on Lex nor reconstructs Lex authority.
 
 ## Missing-capability explanations
 

@@ -84,7 +84,7 @@ export const AXF_TOOL = {
         enum: AXF_RESPONSE_DETAILS,
         default: DEFAULT_AXF_RESPONSE_DETAIL,
         description:
-          "Agent-facing response detail. standard is the context-efficient default; compact returns the minimum safe operation result; diagnostic returns complete compatibility and execution metadata.",
+          "Agent-facing response detail. compact is the deterministic context-efficient default; standard expands the result; diagnostic explicitly adds compatibility and execution metadata with sensitive framework fields redacted.",
       },
       search: {
         type: "string",
@@ -99,7 +99,8 @@ export const AXF_TOOL = {
         type: "integer",
         minimum: 1,
         maximum: 100,
-        description: "Bound list or guide results.",
+        description:
+          "Bound list or guide results. Compact response-detail lists default to 25; an explicit limit overrides that bound.",
       },
       intent: {
         type: "string",

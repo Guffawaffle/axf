@@ -13,6 +13,7 @@ import {
 import {
   buildCapabilityExamples,
   buildWorkflowGuide,
+  DEFAULT_COMPACT_LIMIT,
   explainCapability,
   selectCapabilities,
 } from "../core/discovery.js";
@@ -120,11 +121,11 @@ function performHelp(context) {
           default: DEFAULT_AXF_RESPONSE_DETAIL,
           profiles: [...AXF_RESPONSE_DETAILS],
           compact:
-            "Minimum safe agent result with actionable failures and unchanged capability data.",
+            "Default minimum safe agent result with actionable failures and unchanged capability data; list results default to a 25-item bound.",
           standard:
-            "Agent-first canonical result without legacy aliases or successful execution traces.",
+            "Expanded result without legacy aliases or invocation traces.",
           diagnostic:
-            "Complete compatibility, provenance, workspace, and invocation metadata.",
+            "Explicit compatibility, provenance, workspace, and invocation metadata with sensitive framework fields redacted.",
         },
         capabilitiesAreSeparateTools: false,
         routingNote:
@@ -229,7 +230,11 @@ function performList(context) {
     compact: Boolean(context.input.compact),
     search: context.input.search,
     sideEffects: context.input.sideEffects,
-    limit: context.input.limit ?? undefined,
+    limit:
+      context.input.limit ??
+      (context.input.responseDetail === "compact"
+        ? DEFAULT_COMPACT_LIMIT
+        : undefined),
   });
 
   return attachWorkspace(
