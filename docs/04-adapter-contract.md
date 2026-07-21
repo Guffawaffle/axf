@@ -175,7 +175,10 @@ adapter" until pain proves otherwise.
 
 Adapters ship with `lifecycleState: "draft" | "reviewed" | "active"`.
 `axf doctor` reports adapter load issues; promotion is deliberate. There
-is no implicit promotion when an adapter "works once."
+is no implicit promotion when an adapter "works once." The label is declared
+routing/review state, not proof of provider authorization or completed review.
+The current lifecycle CLI rewrites capability manifests; adapter lifecycle
+changes remain part of the adapter's owning file-review workflow.
 
 ## Agent-assisted adapter work
 

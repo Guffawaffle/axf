@@ -38,7 +38,9 @@ registry. It is intentionally a safe subset, not full CLI parity.
 Current MCP scope:
 
 - `help`
+- `guide`
 - `list`
+- `explain`
 - `inspect`
 - `run`
 - `doctor`

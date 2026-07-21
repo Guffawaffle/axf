@@ -2,13 +2,16 @@
 
 ## Goal
 
-Every runnable unit in AXF should be declared before it is trusted.
+Every runnable unit in AXF should be declared before it enters normal routing.
 
 The manifest layer is the framework/control-plane contract that lets:
 - humans inspect a capability
 - agents scaffold safely
 - AXF resolve consistently
 - policies enforce lifecycle state and side effects
+
+Lifecycle makes declared review state visible; it does not prove review or
+grant authority. See [Lifecycle and promotion](05-lifecycle-and-promotion.md).
 
 ## Capability identity
 

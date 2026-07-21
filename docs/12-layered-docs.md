@@ -1,73 +1,64 @@
-# Documentation Layers
+# Documentation paths
 
-AXF documentation is split into three audiences. Read only what you need.
+AXF documentation has three current paths. Choose the job you are doing now;
+do not read the framework reference merely to call a fitted capability.
 
-## Caller — uses capabilities someone else defined
+| Audience | Start here | Core loop |
+|---|---|---|
+| Caller or coding agent | [Caller guide](callers.md) | `guide → inspect → run` |
+| Integration author | [Integration author guide](integration-authors.md) | recurring ceremony → fit → review → expose |
+| AXF framework author | [Framework author guide](framework-authors.md) | contract → source → tests |
 
-You want to discover what's available in a workspace and run things.
-You do not author manifests or adapters.
+## Caller path
 
-Read in this order:
+Use this path when someone else owns the capability contracts.
 
-1. [README.md](../README.md) — install + first run
-2. [01-vocabulary.md](01-vocabulary.md) — workspace, module, capability
-3. The caller commands:
-   - `axf doctor`
-   - `axf guide [context|check|handoff]`
-   - `axf list --compact --search <term>`
-   - `axf explain <id-or-family>`
-   - `axf inspect <id-or-path>`
-   - `axf run <id-or-path>`
-4. [15-agent-discovery-and-workflow-guide.md](15-agent-discovery-and-workflow-guide.md)
-   — bounded agent bootstrap and discovery diagnostics
+1. Read the [Caller guide](callers.md).
+2. Use `axf guide` for bounded repository entrypoints.
+3. Use compact `list` and `explain` only when you need broader discovery.
+4. `inspect` the selected capability's lifecycle, effects, policies, roots,
+   arguments, provenance, and launch plan.
+5. `run` only after the invocation is authorized.
 
-That is the entire caller surface. Stop here unless you are integrating
-a provider or building the framework itself.
+For detailed discovery envelopes and MCP examples, continue to
+[Agent discovery and workflow](15-agent-discovery-and-workflow-guide.md).
+Stop there unless you are responsible for fitting provider or repository
+ceremony.
 
-## Integrator — wires a provider into a workspace
+## Integration author path
 
-You bring a provider's command vocabulary (git, gh, kubectl, your
-own CLI) into AXF so other people can call it through a single
-contract.
+Use this path when you are turning an existing command family or recurring
+repository workflow into stable capabilities.
 
-Read in this order:
+1. If adoption is undecided, perform the
+   [read-only fit evaluation](agent-evaluation.md).
+2. Read the [Integration author guide](integration-authors.md).
+3. Preserve provider vocabulary with
+   [command families](10-command-families.md).
+4. Use [launch plans](09-launch-plans.md) and argument mapping to express the
+   real execution contract.
+5. Materialize only selective overrides. Normalize only when callers need a
+   stable programmatic result; see
+   [Normalization guidance](11-normalization-guidance.md).
+6. Treat lifecycle as declared routing state and keep review external to the
+   state-changing command; see [Lifecycle and promotion](05-lifecycle-and-promotion.md).
+7. Apply the concrete [Repo onboarding](13-repo-onboarding.md) steps only after
+   approval.
 
-1. [02-architecture.md](02-architecture.md) — registry → resolver →
-   adapter loader → executor
-2. [03-capabilities-and-manifests.md](03-capabilities-and-manifests.md)
-   — capability manifest fields
-3. [04-adapter-contract.md](04-adapter-contract.md) — type vs provider
-   adapters
-4. [09-launch-plans.md](09-launch-plans.md) — interpreter-aware launch
-   plans, env-bound roots, fallback paths
-5. [10-command-families.md](10-command-families.md) — family imports,
-   public-to-provider arg mapping, materialization, drift
-6. [11-normalization-guidance.md](11-normalization-guidance.md) —
-   JSON-first vs text-first providers, when to write a provider adapter
-7. [05-lifecycle-and-promotion.md](05-lifecycle-and-promotion.md) —
-   draft → reviewed → active
+## Framework author path
 
-Integrator workflow:
+Use this path when you are changing AXF's loaders, resolver, adapters, policy,
+execution, diagnostics, CLI, MCP, or response contracts.
 
-```text
-import → inspect → refine → materialize (only what you must) → promote
-```
+Start with the [Framework author guide](framework-authors.md), which routes into
+the relevant architecture references and source directories. Preserve the
+framework's role as an inspectable traffic cop: repository and provider
+contracts should remain outside core unless the behavior is genuinely general.
 
-## Author — extends the framework itself
+## Product boundaries
 
-You add or change framework internals (loaders, validators, type
-adapters that ship with AXF, drift detectors).
-
-Read in this order:
-
-1. [00-foundation.md](00-foundation.md) — why axf exists at all
-2. [02-architecture.md](02-architecture.md) — full picture
-3. [04-adapter-contract.md](04-adapter-contract.md) — both kinds
-4. [08-adapter-folder-shape.md](08-adapter-folder-shape.md)
-5. [07-v0-bootstrap-plan.md](07-v0-bootstrap-plan.md)
-6. [14-family-identity-and-layer-precedence-plan.md](14-family-identity-and-layer-precedence-plan.md)
-7. [15-agent-discovery-and-workflow-guide.md](15-agent-discovery-and-workflow-guide.md)
-8. Source: `src/core/`, `adapters/`, `test/`
-
-Adopt the existing test style (`node:test`, zero deps, real tmp
-workspaces) for any new feature.
+AXF owns current workflow discovery, declared execution contracts, and routing.
+It does not own provider credentials or authorization, and filesystem roots do
+not establish authority. Continuity systems such as Lex may supply historical
+context separately; AXF does not require Lex, and retrieved history is evidence
+rather than an instruction or grant.
