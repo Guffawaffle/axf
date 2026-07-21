@@ -3,9 +3,20 @@
 This is the recommended path for bringing a repository onto AXF without
 copying bespoke wrapper scripts into every repo.
 
+Onboarding is the mutation phase, not the fit assessment. If adoption is still
+an open question, complete the [read-only agent evaluation](agent-evaluation.md)
+first. Creating a workspace marker, manifests, adapters, MCP configuration, or
+lifecycle changes requires separate approval for the repository and user
+configuration in scope.
+
 AXF provides the workspace-native agent exoskeleton framework and
 control plane. The repository owns the capabilities that describe how it
 is built, tested, searched, diagnosed, and operated safely.
+
+Fit the recurring ceremony once, then give callers the smaller
+`guide → inspect → run` path. Preserve existing provider command families by
+default; materialize or normalize only where a stable agent-facing contract
+needs a selective override.
 
 ## 1. Add the project marker first
 

@@ -123,11 +123,24 @@ axf init materialize git status
 ```
 
 This writes `manifests/capabilities/global.git.status.json` derived
-from the family entry, with `lifecycleState: "draft"` and the
-`sourceFamily` back-reference preserved.
+from the family entry with the `sourceFamily` back-reference preserved.
+The standalone capability inherits the command's declared lifecycle when
+present and otherwise defaults to `draft`.
 
 The materialized file shadows the imported synthesis. `inspect` reports
-`origin: materialized`. Edit it freely.
+`origin: materialized`.
+
+This inheritance is important when materializing an `active` family command:
+the new override can be active immediately. If you are about to make
+experimental edits, demote it first:
+
+```sh
+axf demote global.git.status --to draft
+```
+
+Lifecycle changes validate manifest structure; they do not run tests or prove
+review. Follow the repository's review and authorization process before
+returning an override to the normal active surface.
 
 ## Drift
 
@@ -205,7 +218,7 @@ refine     (edit family manifest in place)
   ↓
 materialize  (only what you must override; axf init materialize)
   ↓
-promote    (axf promote <id> --to active)
+demote if needed → edit → review → promote deliberately
 ```
 
 For repo-local `.ax` command families, use `scout` as the compiler step

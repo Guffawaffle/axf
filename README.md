@@ -1,34 +1,126 @@
 # AXF
 
-Agent eXoskeleton Framework for workspace-native agent capabilities.
+**Fit the repository once. Let every agent follow the same paved path.**
 
-AXF (Agent eXoskeleton Framework) gives teams a framework for building
-workspace-native agent exoskeletons: small, self-describing capabilities
-that encode how each codebase is built, tested, searched, diagnosed,
-and operated safely.
+An agent can read your code. It still has to rediscover how this repository
+wants to be built, tested, searched, diagnosed, and operated. The clues are
+usually scattered across scripts, package tasks, prose, CI, and human memory.
 
-The goal is not to automate judgment. The goal is to compress repeated
-local ceremony into reliable workspace capabilities, so agents can spend
-more attention on the actual problem.
+AXF (Agent eXoskeleton Framework) turns that repeated local ceremony into
+small, self-describing capabilities. Fit the exoskeleton deliberately once;
+later agents can discover the right route, inspect its contract, and run it
+without rebuilding the procedure from scratch.
 
-**When AXF helps**
+```text
+recurring repository ceremony
+          ↓ fit once
+inspectable AXF capabilities
+          ↓ reuse
+agent discovers → inspects → runs
+```
 
-- agents keep guessing which build, test, or validation command applies
-- agents repeatedly search for the same repo facts before editing
-- local safety rules live in prose, convention, or human memory
-- brittle shell chains keep getting rebuilt for repo-specific chores
+AXF is a traffic cop, not a replacement vocabulary. It preserves a provider's
+existing command family by default, then projects or normalizes only the parts
+that need a clearer agent-facing contract. The goal is not to automate
+judgment. It is to spend less judgment on reconstructing the same route.
 
-**AXF is not**
+## The five caller concepts
 
-AXF is not a universal command catalog, a replacement for judgment, or
-an MCP-only product. It is the framework and control plane for building
-workspace-native agent exoskeletons from workspace-owned capabilities.
-MCP is one adapter surface; workspaces own the repo-specific
-capabilities agents use as their local exoskeleton.
+You do not need the framework vocabulary to use a fitted repository:
 
-> Status: **alpha**. The core loop is in place: scout, inspect,
-> execute, scaffold, and promote capabilities through one contract.
-> Manifest version `axf/v0` is the current alpha contract.
+- **Workspace** — the repository context whose operating paths you need. In
+  root-sensitive contracts, AXF distinguishes the project root used for
+  discovery from the execution root used as the runtime working directory.
+- **Module** — a reusable capability pack, such as the built-in `echo` module
+  or a repository-owned validation pack.
+- **Capability** — one named operation with declared arguments, output modes,
+  side effects, lifecycle, policies, and an execution target.
+- **Inspect** — read the complete contract before execution.
+- **Run** — execute through that contract after checking its effects and
+  authority requirements.
+
+The smallest proof of life is:
+
+```sh
+npm install --global @smartergpt/axf
+axf doctor
+axf list --compact
+axf inspect echo say
+axf run echo say --message hello
+```
+
+The package is source-available and subject to the license terms below. A
+fitted repository normally adds its own capabilities; `echo.say` only proves
+that the registry, resolver, adapter, and executor are connected.
+
+## Before and after fitting
+
+Before AXF, a new agent searches multiple instruction files, reverse-engineers
+package scripts, guesses the safe validation subset, and repeats that work in
+the next session.
+
+After a deliberate fit, the repository can expose stable entries such as
+`context`, `check`, and `handoff`. A caller starts with `axf guide`, inspects
+the selected capability, and runs the repository-owned route. AXF makes the
+route visible; the repository still owns it.
+
+## Is this repository a fit?
+
+AXF helps when:
+
+- agents repeatedly guess which build, test, or validation command applies;
+- the same repository facts must be rediscovered before editing;
+- local safety rules live in scattered prose, convention, or human memory;
+- brittle shell chains keep being rebuilt for repo-specific chores.
+
+AXF is probably not a fit when one obvious command already covers the work,
+the ceremony is unlikely to recur, or the provider surface changes faster than
+the team can maintain a capability contract.
+
+The adoption question is:
+
+> Does this repository have repeated local operating ceremony that is worth
+> fitting once into stable, inspectable agent capabilities?
+
+For a bounded, strictly read-only assessment, give an agent this prompt:
+
+```text
+Evaluate whether this repository is a fit for AXF by following
+docs/agent-evaluation.md. Do not install AXF, edit files, scaffold or promote
+capabilities, invoke MCP tools, or run repository code. Inspect only the
+existing scripts, package tasks, documentation, agent instructions, CI and
+platform/runtime constraints. Identify repeated mistakes and existing overlap,
+then return exactly one verdict: adopt, pilot, defer, or not a fit. Include the
+evidence, expected fitting cost, ongoing drift cost, authority boundaries, and
+the smallest reversible pilot. Do not perform the pilot without separate
+approval.
+```
+
+See [Agent fit evaluation](docs/agent-evaluation.md) for the evidence checklist,
+verdict definitions, and response template.
+
+## Choose your path
+
+| You are... | Start here | Your job |
+|---|---|---|
+| A caller or coding agent | [Caller guide](docs/callers.md) | Discover, inspect, and run capabilities someone else fitted. |
+| An integration author | [Integration author guide](docs/integration-authors.md) | Fit existing repository or provider ceremony into stable capabilities. |
+| An AXF framework author | [Framework author guide](docs/framework-authors.md) | Change loaders, resolution, adapters, policy, MCP, or other AXF internals. |
+
+Stop at the caller guide unless you are responsible for fitting a provider or
+changing AXF itself. The complete audience map is in
+[Documentation layers](docs/12-layered-docs.md).
+
+> Status: **alpha**. The core loop is in place: scout, inspect, execute,
+> scaffold, and promote capabilities through one contract. Manifest version
+> `axf/v0` is the current alpha contract.
+
+## What AXF is not
+
+AXF is not a universal command catalog, a source of authorization, a
+replacement for provider identity, a substitute for review, or an MCP-only
+product. MCP is one agent-facing surface over the same registry and execution
+path.
 
 ## Install and MCP
 
@@ -382,7 +474,9 @@ entries under `/mnt/c/...`.
 The MCP server exposes one tool named `axf`. Supported operations are:
 
 - `help`
+- `guide`
 - `list`
+- `explain`
 - `inspect`
 - `run`
 - `doctor`
@@ -462,8 +556,13 @@ See [`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md) for the concrete 
 
 ## How to add a new provider
 
-The contract is open. Every new provider goes through the same
-scaffolders and lifecycle gates:
+The contract is open. First decide whether the provider needs a command family,
+a selective materialized override, or a provider adapter. The
+[Integration author guide](docs/integration-authors.md) contains that decision
+path. A provider adapter is only needed when the generic CLI route cannot
+express the provider's argument, envelope, failure, or output contract.
+
+When a provider adapter is justified, the scaffold starts in `draft`:
 
 ```sh
 # 1. Scaffold a draft provider adapter (only if the provider has an
@@ -475,7 +574,7 @@ axf init capability global.acme.status
 
 # 3. Edit the drafts, then:
 axf doctor
-axf run acme status --axf-any-lifecycle
+axf inspect global.acme.status --json
 ```
 
 The four canonical prompts under [`prompts/`](prompts/) walk an agent
@@ -483,6 +582,11 @@ through discovery → planning → scaffolding → review against the actual
 file contract. JSON-first providers can usually use the generic `cli`
 adapter directly; provider adapters are for wrappers that need envelope,
 error, or argument normalization beyond the generic route.
+
+Running a non-active capability requires an explicit lifecycle opt-in and can
+still execute real provider effects. Do that only after inspection and the
+repository's normal approval process. Lifecycle changes validate manifests;
+they do not perform the review.
 
 ## Layout
 
@@ -500,34 +604,21 @@ docs/                           # architecture, contract, lifecycle, prompts
 test/                           # node:test suite
 ```
 
-## Reading order
+## Documentation
 
-1. [`docs/00-foundation.md`](docs/00-foundation.md) — why axf exists
-2. [`docs/01-vocabulary.md`](docs/01-vocabulary.md)
-3. [`docs/02-architecture.md`](docs/02-architecture.md)
-4. [`docs/03-capabilities-and-manifests.md`](docs/03-capabilities-and-manifests.md)
-5. [`docs/04-adapter-contract.md`](docs/04-adapter-contract.md) — the
-   two-kind adapter model (type + provider)
-6. [`docs/05-lifecycle-and-promotion.md`](docs/05-lifecycle-and-promotion.md)
-7. [`docs/06-canonical-prompts.md`](docs/06-canonical-prompts.md)
-8. [`docs/07-v0-bootstrap-plan.md`](docs/07-v0-bootstrap-plan.md) —
-  alpha implementation milestones
-9. [`docs/08-adapter-folder-shape.md`](docs/08-adapter-folder-shape.md)
-   — the concrete file contract
-10. [`docs/09-launch-plans.md`](docs/09-launch-plans.md) —
-    interpreter-aware launch plans, env-bound roots, fallback paths
-11. [`docs/10-command-families.md`](docs/10-command-families.md) —
-    family imports, public-to-provider arg mapping, materialization,
-    drift
-12. [`docs/11-normalization-guidance.md`](docs/11-normalization-guidance.md)
-    — JSON-first vs text-first providers, when to write a provider
-    adapter
-13. [`docs/12-layered-docs.md`](docs/12-layered-docs.md) — caller /
-    integrator / author paths through the docs
-14. [`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md) —
-  workspace markers, shared packs, and platform guidance
-15. [`docs/14-family-identity-and-layer-precedence-plan.md`](docs/14-family-identity-and-layer-precedence-plan.md) —
-  family identity, layer precedence, and optional shared-pack direction
+Start with the path for your current job:
+
+- [Caller guide](docs/callers.md) — discover, inspect, and run fitted
+  capabilities.
+- [Integration author guide](docs/integration-authors.md) — fit recurring
+  repository or provider ceremony while preserving provider vocabulary.
+- [Framework author guide](docs/framework-authors.md) — change AXF internals
+  and cross-surface contracts.
+
+[Documentation paths](docs/12-layered-docs.md) routes each audience to the
+relevant reference documents. Use the
+[read-only agent fit evaluation](docs/agent-evaluation.md) before onboarding an
+undecided repository.
 
 ## Tests
 
