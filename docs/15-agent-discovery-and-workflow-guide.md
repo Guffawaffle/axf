@@ -27,9 +27,21 @@ of 100.
 
 When a workspace declares a composite session-context capability, prefer that
 single operation for startup/resume/compaction. The packaged
-`templates/session-context` recipe combines AXF guidance with bounded Lex
-history without coupling Lex into AXF core. Its provider is read-only and
-degrades to whichever component is available.
+`templates/session-context` recipe combines AXF guidance with bounded episodic
+Lex history without coupling Lex into AXF core. Its optional KnowledgeFrame
+provider rollout is explicit:
+
+- `off` is the default and invokes no context provider;
+- `shadow` invokes only the declared read-oriented capability and returns
+  body-free provider health, selection, freshness, provenance, and budget
+  telemetry;
+- missing, empty, stale, invalid, or unavailable providers preserve ordinary
+  guidance and continuity with structured warnings.
+
+The composer uses one total token ledger and deterministic truncation order.
+Return to `--context-mode off` for a one-line rollback. Provider indexing is a
+separate write-classified capability and is never invoked by `guide` or
+session start.
 
 ## Workspace recommendations
 

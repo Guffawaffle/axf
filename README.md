@@ -176,7 +176,8 @@ axf integrate codex --check --smoke
 ```
 
 Writes are scoped to the AXF package spec in Codex `config.toml`; restart or
-reopen Codex afterward. For one-call AXF + Lex bootstrap, see the packaged
+reopen Codex afterward. For one-call AXF + Lex bootstrap, including the
+explicit `off | shadow` KnowledgeFrame provider rollout, see the packaged
 `templates/session-context` workspace recipe and
 [`docs/13-repo-onboarding.md`](docs/13-repo-onboarding.md).
 

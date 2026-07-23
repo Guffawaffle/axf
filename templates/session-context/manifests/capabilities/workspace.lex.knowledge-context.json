@@ -1,0 +1,47 @@
+{
+  "manifestVersion": "axf/v0",
+  "id": "workspace.lex.knowledge-context",
+  "summary": "Return body-free shadow telemetry from Lex KnowledgeFrame context",
+  "provider": "lex",
+  "adapterType": "cli",
+  "executionTarget": {
+    "target": {
+      "path": "scripts/axf/lex-knowledge-context.mjs",
+      "relativeTo": "workspace"
+    },
+    "launcher": {
+      "command": "node"
+    },
+    "cwd": {
+      "path": ".",
+      "relativeTo": "workspace"
+    }
+  },
+  "argsSchema": {
+    "type": "object",
+    "properties": {
+      "query": { "type": "string", "maxLength": 1000 },
+      "project-root": { "type": "string" },
+      "execution-root": { "type": "string" },
+      "branch": { "type": "string", "maxLength": 240 },
+      "repository-key": { "type": "string", "maxLength": 240 },
+      "limit": { "type": "integer", "minimum": 1, "maximum": 20 },
+      "max-bytes": { "type": "integer", "minimum": 1024, "maximum": 16000 }
+    },
+    "additionalProperties": false
+  },
+  "outputModes": ["json"],
+  "sideEffects": "read",
+  "scope": "workspace-local",
+  "lifecycleState": "active",
+  "defaults": {
+    "query": "",
+    "limit": 5,
+    "max-bytes": 4096
+  },
+  "policies": ["require_workspace_binding"],
+  "owner": "workspace:knowledge-context",
+  "examples": [
+    "axf run workspace.lex.knowledge-context --query 'repair transition' --project-root . --execution-root . --branch main --json"
+  ]
+}

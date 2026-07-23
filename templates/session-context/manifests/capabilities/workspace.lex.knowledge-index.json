@@ -1,0 +1,35 @@
+{
+  "manifestVersion": "axf/v0",
+  "id": "workspace.lex.knowledge-index",
+  "summary": "Explicitly rebuild the disposable Lex KnowledgeFrame snapshot",
+  "provider": "lex",
+  "adapterType": "cli",
+  "executionTarget": {
+    "command": "lex",
+    "args": ["--json", "knowledge", "index"],
+    "cwd": {
+      "path": ".",
+      "relativeTo": "workspace"
+    }
+  },
+  "argsSchema": {
+    "type": "object",
+    "properties": {
+      "project-root": { "type": "string" },
+      "repository-key": { "type": "string" },
+      "database": { "type": "string" }
+    },
+    "additionalProperties": false
+  },
+  "outputModes": ["json"],
+  "sideEffects": "write",
+  "scope": "workspace-local",
+  "lifecycleState": "active",
+  "defaults": {},
+  "policies": ["require_workspace_binding"],
+  "owner": "workspace:knowledge-context",
+  "examples": [
+    "axf inspect workspace.lex.knowledge-index",
+    "axf run workspace.lex.knowledge-index --project-root . --json"
+  ]
+}
