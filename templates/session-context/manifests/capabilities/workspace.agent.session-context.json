@@ -1,7 +1,7 @@
 {
   "manifestVersion": "axf/v0",
   "id": "workspace.agent.session-context",
-  "summary": "Compose bounded AXF workflow guidance with prompt-safe Lex history",
+  "summary": "Compose bounded AXF guidance, episodic Lex continuity, and optional body-free provider telemetry",
   "provider": "workspace",
   "adapterType": "cli",
   "executionTarget": {
@@ -26,7 +26,10 @@
       "branch": { "type": "string" },
       "limit": { "type": "integer", "minimum": 1, "maximum": 20 },
       "max-tokens": { "type": "integer", "minimum": 256, "maximum": 4000 },
-      "max-output-chars": { "type": "integer", "minimum": 2000, "maximum": 30000 }
+      "max-output-chars": { "type": "integer", "minimum": 1000, "maximum": 30000 },
+      "context-mode": { "type": "string", "enum": ["off", "shadow"] },
+      "context-provider": { "type": "string", "maxLength": 200 },
+      "context-repository-key": { "type": "string", "maxLength": 240 }
     },
     "additionalProperties": false
   },
@@ -38,12 +41,15 @@
     "intent": "session bootstrap",
     "limit": 5,
     "max-tokens": 1200,
-    "max-output-chars": 16000
+    "max-output-chars": 16000,
+    "context-mode": "off",
+    "context-provider": "workspace.lex.knowledge-context"
   },
   "policies": ["require_workspace_binding"],
   "owner": "workspace:agent-continuity",
   "recommendedFor": ["session-start"],
   "examples": [
-    "axf run workspace.agent.session-context --intent 'continue current work' --json"
+    "axf run workspace.agent.session-context --intent 'continue current work' --context-mode off --json",
+    "axf run workspace.agent.session-context --intent 'continue current work' --context-mode shadow --context-provider workspace.lex.knowledge-context --json"
   ]
 }
