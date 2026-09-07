@@ -4,7 +4,7 @@
   "title": "AXF",
   "description": "Agent eXoskeleton Framework control plane for workspace-native agent capabilities over MCP.",
   "repository": {
-    "url": "https://github.com/Guffawaffle/axf",
+    "url": "https://github.com/SmarterGPT/axf",
     "source": "github"
   },
   "version": "2.1.3",
