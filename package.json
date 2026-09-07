@@ -40,11 +40,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Guffawaffle/axf.git"
+    "url": "git+https://github.com/SmarterGPT/axf.git"
   },
   "homepage": "https://smartergpt.dev/axf",
   "bugs": {
-    "url": "https://github.com/Guffawaffle/axf/issues"
+    "url": "https://github.com/SmarterGPT/axf/issues"
   },
   "mcpName": "dev.smartergpt/axf",
   "license": "Apache-2.0",
